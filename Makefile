@@ -1,0 +1,37 @@
+TITLE_ID = PKTV00001
+TARGET   = PocketVideo
+OBJS     = src/main.o src/network.o src/invidious.o src/ui.o
+
+LIBS = -lvita2d -lfreetype -lpng -ljpeg -lz -lcurl -lmbedtls -lmbedx509 -lmbedcrypto \
+       -lcjson -lSceLibKernel_stub -lSceDisplay_stub -lSceGxm_stub -lSceCtrl_stub \
+       -lSceTouch_stub -lScePgf_stub -lSceCommonDialog_stub -lSceNet_stub \
+       -lSceNetCtl_stub -lSceHttp_stub -lSceSsl_stub -lSceSysmodule_stub \
+       -lSceAppMgr_stub -lSceAvPlayer_stub -lm
+
+PREFIX  = arm-vita-eabi
+CC      = $(PREFIX)-gcc
+CFLAGS  = -Wl,-q -Wall -O3 -Iinclude -I$(VITASDK)/arm-vita-eabi/include
+ASFLAGS = $(CFLAGS)
+
+all: $(TARGET).vpk
+
+%.vpk: eboot.bin
+	vita-mksfoex -s TITLE_ID=$(TITLE_ID) "PocketVideo" param.sfo
+	vita-pack-vpk -s param.sfo -b eboot.bin \
+		--add sce_sys/icon0.png=sce_sys/icon0.png \
+		--add sce_sys/livearea/contents/bg.png=sce_sys/livearea/contents/bg.png \
+		--add sce_sys/livearea/contents/startup.png=sce_sys/livearea/contents/startup.png \
+		--add sce_sys/livearea/contents/template.xml=sce_sys/livearea/contents/template.xml \
+		$@
+
+eboot.bin: $(TARGET).velf
+	vita-make-fself -c $< $@
+
+%.velf: %.elf
+	vita-elf-create $< $@
+
+$(TARGET).elf: $(OBJS)
+	$(CC) $(CFLAGS) $^ $(LIBS) -o $@
+
+clean:
+	@rm -rf $(TARGET).vpk $(TARGET).velf $(TARGET).elf $(OBJS) param.sfo eboot.bin

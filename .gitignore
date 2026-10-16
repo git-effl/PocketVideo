@@ -1,0 +1,10 @@
+# VitaSDK build artifacts
+build/
+*.vpk
+*.velf
+*.elf
+*.sfo
+eboot.bin
+*.o
+*.a
+.DS_Store
