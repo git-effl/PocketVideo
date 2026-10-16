@@ -23,34 +23,41 @@ extern "C" {
 #define COLOR_TEXT_DIM        RGBA8(170, 180, 200, 255)
 #define COLOR_HIGHLIGHT_AMBER RGBA8(255, 175, 20, 255)
 
-typedef enum {
-    VIEW_HOME_BUBBLES = 0,
-    VIEW_TRENDING_LIST,
-    VIEW_SEARCH,
-    VIEW_PLAYER,
-    VIEW_SETTINGS
-} AppView;
+// Global asset texture pointers
+extern vita2d_texture *g_tex_bg;
+extern vita2d_texture *g_tex_bubble_glass;
+extern vita2d_texture *g_tex_icon_trending;
+extern vita2d_texture *g_tex_icon_search;
+extern vita2d_texture *g_tex_icon_settings;
+extern vita2d_texture *g_tex_icon_play;
+extern vita2d_texture *g_tex_icon_pause;
 
-typedef struct {
-    float x, y;
-    float radius;
-    const char *title;
-    const char *subtitle;
-    unsigned int color_base;
-    unsigned int color_accent;
-    int is_pressed;
-    int is_selected;
-} UiBubble;
+// Global typography pointers
+extern vita2d_font *g_font_noto;
+extern vita2d_pvf  *g_font_pvf_fallback;
 
 /**
- * Initialize 2D graphics subsystem (vita2d) and load UI fonts/textures.
+ * Initialize 2D graphics subsystem (vita2d), load Noto Sans font,
+ * and load all UI PNG textures from app0:assets/.
+ * Returns 0 on success, negative error code on failure.
  */
 int ui_init(void);
 
 /**
- * Free UI resources and shutdown vita2d.
+ * Free all textures, fonts, and shutdown vita2d.
  */
 void ui_term(void);
+
+/**
+ * Draw background wallpaper using app0:assets/textures/livearea_bg.png
+ */
+void ui_draw_background(void);
+
+/**
+ * Unified text drawing helper: uses Noto Sans (vita2d_font) if available,
+ * otherwise falls back to system PVF font.
+ */
+void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const char *text);
 
 /**
  * Render the top status bar (Vita clock, battery status, Wi-Fi icon).
@@ -58,12 +65,14 @@ void ui_term(void);
 void ui_draw_status_bar(const char *title);
 
 /**
- * Render a tactile 2012-style glossy bubble with radial gradient and bevel highlight.
+ * Render an authentic 2012 tactile glossy bubble with embedded icon & glass reflection.
  */
-void ui_draw_bubble(const UiBubble *bubble);
+void ui_draw_bubble_with_icon(float cx, float cy, float radius,
+                              vita2d_texture *icon, const char *title,
+                              unsigned int base_col, int is_pressed, int is_selected);
 
 /**
- * Render a video card in the trending list view.
+ * Render a video card in the trending list view using loaded play icon.
  */
 void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *item, int is_focused);
 

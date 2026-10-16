@@ -22,6 +22,16 @@ all: $(TARGET).vpk
 		--add sce_sys/livearea/contents/bg.png=sce_sys/livearea/contents/bg.png \
 		--add sce_sys/livearea/contents/startup.png=sce_sys/livearea/contents/startup.png \
 		--add sce_sys/livearea/contents/template.xml=sce_sys/livearea/contents/template.xml \
+		--add assets/fonts/NotoSans-Regular.ttf=assets/fonts/NotoSans-Regular.ttf \
+		--add assets/textures/livearea_bg.png=assets/textures/livearea_bg.png \
+		--add assets/textures/bubble_glass.png=assets/textures/bubble_glass.png \
+		--add assets/icons/trending.png=assets/icons/trending.png \
+		--add assets/icons/search.png=assets/icons/search.png \
+		--add assets/icons/settings.png=assets/icons/settings.png \
+		--add assets/icons/play.png=assets/icons/play.png \
+		--add assets/icons/pause.png=assets/icons/pause.png \
+		--add assets/sounds/bubble_pop.wav=assets/sounds/bubble_pop.wav \
+		--add assets/sounds/peel.wav=assets/sounds/peel.wav \
 		$@
 
 eboot.bin: $(TARGET).velf

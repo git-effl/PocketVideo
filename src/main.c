@@ -20,11 +20,12 @@
 #include "invidious.h"
 #include "ui.h"
 
-// Global video list
 static VideoList g_trending;
 static int g_selected_index = 0;
 static int g_network_ready = 0;
 static char g_status_msg[256] = "Initializing PocketVideo...";
+static AppView g_current_view = VIEW_HOME_BUBBLES;
+static int g_bubble_selected = 0; // 0=Trending, 1=Search, 2=Settings
 
 int main(int argc, char *argv[]) {
     printf("=========================================\n");
@@ -33,7 +34,6 @@ int main(int argc, char *argv[]) {
     printf("=========================================\n");
 
 #ifdef __vita__
-    // Configure sampling mode for front touch panel and analog stick
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
     sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
 #endif
@@ -76,7 +76,7 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // 3. Initialize vita2d 2D Graphics Engine
+    // 3. Initialize vita2d 2D Graphics Engine & Load Assets (Noto Sans + Textures)
     ui_init();
 
     // 4. Main Event & Render Loop
@@ -93,29 +93,33 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        // Navigate list with D-Pad
-        if (pad.buttons & SCE_CTRL_DOWN) {
-            if (g_selected_index < g_trending.count - 1) {
-                g_selected_index++;
-                sceKernelDelayThread(150000); // 150ms debounce
+        // Navigation controls
+        if (g_current_view == VIEW_HOME_BUBBLES) {
+            if (pad.buttons & SCE_CTRL_RIGHT) {
+                if (g_bubble_selected < 2) { g_bubble_selected++; sceKernelDelayThread(150000); }
+            } else if (pad.buttons & SCE_CTRL_LEFT) {
+                if (g_bubble_selected > 0) { g_bubble_selected--; sceKernelDelayThread(150000); }
+            } else if (pad.buttons & SCE_CTRL_CROSS) {
+                if (g_bubble_selected == 0) g_current_view = VIEW_TRENDING_LIST;
+                sceKernelDelayThread(200000);
             }
-        } else if (pad.buttons & SCE_CTRL_UP) {
-            if (g_selected_index > 0) {
-                g_selected_index--;
-                sceKernelDelayThread(150000);
+        } else if (g_current_view == VIEW_TRENDING_LIST) {
+            if (pad.buttons & SCE_CTRL_DOWN) {
+                if (g_selected_index < g_trending.count - 1) {
+                    g_selected_index++;
+                    sceKernelDelayThread(150000);
+                }
+            } else if (pad.buttons & SCE_CTRL_UP) {
+                if (g_selected_index > 0) {
+                    g_selected_index--;
+                    sceKernelDelayThread(150000);
+                }
+            } else if (pad.buttons & SCE_CTRL_CIRCLE) {
+                g_current_view = VIEW_HOME_BUBBLES;
+                sceKernelDelayThread(200000);
+            } else if (pad.buttons & SCE_CTRL_TRIANGLE) {
+                invidious_fetch_trending(INVIDIOUS_DEFAULT_HOST, &g_trending);
             }
-        } else if (pad.buttons & SCE_CTRL_CROSS) {
-            // User selected a video to play
-            if (g_trending.count > 0) {
-                printf("[Main] Playing video: [%s] %s\n", 
-                       g_trending.items[g_selected_index].id,
-                       g_trending.items[g_selected_index].title);
-                // Video playback with sceAvPlayer will be initialized here
-            }
-        } else if (pad.buttons & SCE_CTRL_TRIANGLE) {
-            // Refresh feed
-            printf("[Main] Refreshing trending feed...\n");
-            invidious_fetch_trending(INVIDIOUS_DEFAULT_HOST, &g_trending);
         }
 #endif
 
@@ -123,39 +127,51 @@ int main(int argc, char *argv[]) {
         vita2d_start_drawing();
         vita2d_clear_screen();
 
-        // 1. Draw 2012 PlayStation Vita Status Bar
-        ui_draw_status_bar("PocketVideo - Trending Feed");
+        // 1. Draw Textured Background
+        ui_draw_background();
 
-        // 2. Draw Video List or Empty State
-        if (g_trending.count > 0) {
-            float start_y = 44.0f;
-            float card_h = 84.0f;
-            int visible_items = 5;
-            int offset = g_selected_index - 2;
-            if (offset < 0) offset = 0;
-            if (offset > g_trending.count - visible_items) offset = g_trending.count - visible_items;
-            if (offset < 0) offset = 0;
+        // 2. Draw 2012 PlayStation Vita Status Bar
+        ui_draw_status_bar("PocketVideo - Invidious Client");
 
-            for (int i = 0; i < visible_items && (offset + i) < g_trending.count; i++) {
-                int item_idx = offset + i;
-                int is_focused = (item_idx == g_selected_index);
-                ui_draw_video_card(20.0f, start_y + (i * (card_h + 8.0f)), 920.0f, card_h,
-                                   &g_trending.items[item_idx], is_focused);
+        if (g_current_view == VIEW_HOME_BUBBLES) {
+            // LiveArea Bubble Grid Screen
+            ui_draw_text(300, 100, COLOR_TEXT_LIGHT, 24, "POCKETVIDEO LIVEAREA");
+            ui_draw_text(260, 130, COLOR_TEXT_DIM, 15, "Select a category using D-Pad or Touch screen");
+
+            // Bubble 1: Trending Videos
+            ui_draw_bubble_with_icon(280.0f, 280.0f, 54.0f, g_tex_icon_trending,
+                                     "Trending", COLOR_VITA_BLUE, 0, (g_bubble_selected == 0));
+
+            // Bubble 2: Search Videos
+            ui_draw_bubble_with_icon(480.0f, 280.0f, 54.0f, g_tex_icon_search,
+                                     "Search", COLOR_VITA_CYAN, 0, (g_bubble_selected == 1));
+
+            // Bubble 3: Instance Settings
+            ui_draw_bubble_with_icon(680.0f, 280.0f, 54.0f, g_tex_icon_settings,
+                                     "Instance", RGBA8(180, 80, 220, 255), 0, (g_bubble_selected == 2));
+
+            // Hint
+            ui_draw_text(330, 480, COLOR_HIGHLIGHT_AMBER, 16, "Press CROSS to enter Trending feed");
+        } else if (g_current_view == VIEW_TRENDING_LIST) {
+            // Video List View
+            if (g_trending.count > 0) {
+                float start_y = 44.0f;
+                float card_h = 84.0f;
+                int visible_items = 5;
+                int offset = g_selected_index - 2;
+                if (offset < 0) offset = 0;
+                if (offset > g_trending.count - visible_items) offset = g_trending.count - visible_items;
+                if (offset < 0) offset = 0;
+
+                for (int i = 0; i < visible_items && (offset + i) < g_trending.count; i++) {
+                    int item_idx = offset + i;
+                    int is_focused = (item_idx == g_selected_index);
+                    ui_draw_video_card(20.0f, start_y + (i * (card_h + 8.0f)), 920.0f, card_h,
+                                       &g_trending.items[item_idx], is_focused);
+                }
+            } else {
+                ui_draw_text(360, 270, COLOR_TEXT_LIGHT, 18, g_status_msg);
             }
-        } else {
-            // Draw loading or error message in tactile bubble container
-            UiBubble alert_bubble = {
-                .x = 480.0f,
-                .y = 260.0f,
-                .radius = 70.0f,
-                .title = g_status_msg,
-                .subtitle = "Press Triangle to Retry",
-                .color_base = COLOR_VITA_BLUE,
-                .color_accent = COLOR_VITA_CYAN,
-                .is_pressed = 0,
-                .is_selected = 1
-            };
-            ui_draw_bubble(&alert_bubble);
         }
 
         // 3. Draw Peelable LiveArea tab

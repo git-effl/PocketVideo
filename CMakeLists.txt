@@ -28,10 +28,9 @@ set(SOURCES
 add_executable(pocketvideo ${SOURCES})
 
 # Libraries to link:
-# - vita2d: 2D hardware-accelerated graphics (GXM wrapper)
+# - vita2d + freetype: 2D hardware graphics and Noto Sans font loading
 # - libcurl + mbedtls: HTTPS client for Invidious REST API
 # - cJSON: Lightweight JSON parser
-# - Sce system libraries (Net, Ssl, Sysmodule, AppMgr, Ctrl, Touch, Pgf, Display, Gxm)
 target_link_libraries(pocketvideo
   vita2d
   freetype
@@ -70,4 +69,14 @@ vita_create_vpk(PocketVideo.vpk "PKTV00001" eboot.bin
   FILE sce_sys/livearea/contents/bg.png sce_sys/livearea/contents/bg.png
   FILE sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
   FILE sce_sys/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
+  FILE assets/fonts/NotoSans-Regular.ttf assets/fonts/NotoSans-Regular.ttf
+  FILE assets/textures/livearea_bg.png assets/textures/livearea_bg.png
+  FILE assets/textures/bubble_glass.png assets/textures/bubble_glass.png
+  FILE assets/icons/trending.png assets/icons/trending.png
+  FILE assets/icons/search.png assets/icons/search.png
+  FILE assets/icons/settings.png assets/icons/settings.png
+  FILE assets/icons/play.png assets/icons/play.png
+  FILE assets/icons/pause.png assets/icons/pause.png
+  FILE assets/sounds/bubble_pop.wav assets/sounds/bubble_pop.wav
+  FILE assets/sounds/peel.wav assets/sounds/peel.wav
 )
