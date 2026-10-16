@@ -1,6 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
 
-# Check if VITASDK environment variable is defined
 if(NOT DEFINED ENV{VITASDK})
   message(FATAL_ERROR "Please define VITASDK to point to your SDK path!")
 endif()
@@ -16,7 +15,6 @@ include_directories(
   ${VITASDK}/arm-vita-eabi/include
 )
 
-# Source files
 set(SOURCES
   src/main.c
   src/network.c
@@ -24,13 +22,8 @@ set(SOURCES
   src/ui.c
 )
 
-# Output executable
 add_executable(pocketvideo ${SOURCES})
 
-# Libraries to link:
-# - vita2d + freetype: 2D hardware graphics and Noto Sans font loading
-# - libcurl + mbedtls: HTTPS client for Invidious REST API
-# - cJSON: Lightweight JSON parser
 target_link_libraries(pocketvideo
   vita2d
   freetype
@@ -59,7 +52,6 @@ target_link_libraries(pocketvideo
   m
 )
 
-# Vita VPK Packaging
 vita_create_self(eboot.bin pocketvideo UNSAFE)
 
 vita_create_vpk(PocketVideo.vpk "PKTV00001" eboot.bin
@@ -70,7 +62,7 @@ vita_create_vpk(PocketVideo.vpk "PKTV00001" eboot.bin
   FILE sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
   FILE sce_sys/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
   FILE assets/fonts/NotoSans-Regular.ttf assets/fonts/NotoSans-Regular.ttf
-  FILE assets/textures/livearea_bg.png assets/textures/livearea_bg.png
+  FILE assets/textures/bg.png assets/textures/bg.png
   FILE assets/textures/bubble_glass.png assets/textures/bubble_glass.png
   FILE assets/icons/trending.png assets/icons/trending.png
   FILE assets/icons/search.png assets/icons/search.png

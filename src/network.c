@@ -10,7 +10,7 @@
 #include <psp2/sysmodule.h>
 #include <psp2/kernel/processmgr.h>
 
-#define NET_PARAM_MEM_SIZE (1 * 1024 * 1024) // 1MB pool for Vita network
+#define NET_PARAM_MEM_SIZE (1 * 1024 * 1024)
 static char net_memory[NET_PARAM_MEM_SIZE];
 #endif
 
@@ -26,25 +26,23 @@ static size_t write_memory_callback(void *contents, size_t size, size_t nmemb, v
     char *ptr = realloc(mem->memory, mem->size + realsize + 1);
     if (!ptr) {
         printf("[Network] ERROR: Out of memory reallocating buffer (%zu bytes)\n", mem->size + realsize + 1);
-        return 0; // aborts curl transfer
+        return 0;
     }
 
     mem->memory = ptr;
     memcpy(&(mem->memory[mem->size]), contents, realsize);
     mem->size += realsize;
-    mem->memory[mem->size] = 0; // null-terminate string
+    mem->memory[mem->size] = 0;
 
     return realsize;
 }
 
 int net_init(void) {
 #ifdef __vita__
-    // 1. Load Sony Network & SSL sysmodules
     sceSysmoduleLoadModule(SCE_SYSMODULE_NET);
     sceSysmoduleLoadModule(SCE_SYSMODULE_HTTP);
     sceSysmoduleLoadModule(SCE_SYSMODULE_SSL);
 
-    // 2. Initialize SceNet socket subsystem
     SceNetInitParam net_param;
     memset(&net_param, 0, sizeof(net_param));
     net_param.memory = net_memory;
@@ -63,14 +61,12 @@ int net_init(void) {
         return ret;
     }
 
-    // Check Wi-Fi state
     int state = 0;
     sceNetCtlGetState(&state);
-    printf("[Network] PS Vita NetCtl State: %d (Connected: %s)\n", 
+    printf("[Network] NetCtl State: %d (Connected: %s)\n", 
            state, (state == SCE_NETCTL_STATE_CONNECTED) ? "YES" : "NO");
 #endif
 
-    // 3. Initialize libcurl global state
     CURLcode curl_ret = curl_global_init(CURL_GLOBAL_ALL);
     if (curl_ret != CURLE_OK) {
         printf("[Network] curl_global_init failed: %s\n", curl_easy_strerror(curl_ret));
@@ -106,22 +102,17 @@ int http_get(const char *url, HttpResponse *out_response) {
     }
 
     MemoryChunk chunk;
-    chunk.memory = malloc(1); // will be grown as needed by write_memory_callback
+    chunk.memory = malloc(1);
     chunk.size = 0;
 
-    // Set cURL options
     curl_easy_setopt(curl_handle, CURLOPT_URL, url);
     curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_memory_callback);
     curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void *)&chunk);
-    curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "PocketVideo-Vita/1.0 (PlayStation Vita)");
+    curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "PocketVideo/1.0");
     curl_easy_setopt(curl_handle, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, 12L);
     curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, 6L);
 
-    // TLS Certificate Verification:
-    // On PS Vita homebrew, standard system CA certificates may not be exposed to mbedtls/openssl.
-    // If a user bundle is placed at ux0:data/pocketvideo/cacert.pem, load it.
-    // Otherwise disable peer verification to avoid TLS handshake failures on public Invidious instances.
     FILE *ca_test = fopen("ux0:data/pocketvideo/cacert.pem", "r");
     if (ca_test) {
         fclose(ca_test);
@@ -129,17 +120,14 @@ int http_get(const char *url, HttpResponse *out_response) {
         curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
         curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYHOST, 2L);
     } else {
-        // Fallback for homebrew environments without bundled root certificates
         curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 0L);
         curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYHOST, 0L);
     }
 
-    // Set custom headers
     struct curl_slist *headers = NULL;
     headers = curl_slist_append(headers, "Accept: application/json");
     curl_easy_setopt(curl_handle, CURLOPT_HTTPHEADER, headers);
 
-    // Perform request
     CURLcode res = curl_easy_perform(curl_handle);
 
     if (res != CURLE_OK) {
@@ -151,7 +139,6 @@ int http_get(const char *url, HttpResponse *out_response) {
         return -2;
     }
 
-    // Inspect HTTP status code
     curl_easy_getinfo(curl_handle, CURLINFO_RESPONSE_CODE, &out_response->http_status);
     curl_slist_free_all(headers);
     curl_easy_cleanup(curl_handle);

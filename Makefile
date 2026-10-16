@@ -23,7 +23,7 @@ all: $(TARGET).vpk
 		--add sce_sys/livearea/contents/startup.png=sce_sys/livearea/contents/startup.png \
 		--add sce_sys/livearea/contents/template.xml=sce_sys/livearea/contents/template.xml \
 		--add assets/fonts/NotoSans-Regular.ttf=assets/fonts/NotoSans-Regular.ttf \
-		--add assets/textures/livearea_bg.png=assets/textures/livearea_bg.png \
+		--add assets/textures/bg.png=assets/textures/bg.png \
 		--add assets/textures/bubble_glass.png=assets/textures/bubble_glass.png \
 		--add assets/icons/trending.png=assets/icons/trending.png \
 		--add assets/icons/search.png=assets/icons/search.png \

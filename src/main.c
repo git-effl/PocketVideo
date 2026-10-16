@@ -1,8 +1,6 @@
 /**
- * PocketVideo - PlayStation Vita Invidious Client
- * 
- * Target: PlayStation Vita (VitaSDK arm-vita-eabi-gcc)
- * Endpoint: https://invidious.f5.si/api/v1/trending
+ * PocketVideo - Invidious Video Client
+ * Target API: https://invidious.f5.si/api/v1/trending
  */
 
 #include <stdio.h>
@@ -25,11 +23,11 @@ static int g_selected_index = 0;
 static int g_network_ready = 0;
 static char g_status_msg[256] = "Initializing PocketVideo...";
 static AppView g_current_view = VIEW_HOME_BUBBLES;
-static int g_bubble_selected = 0; // 0=Trending, 1=Search, 2=Settings
+static int g_bubble_selected = 0;
 
 int main(int argc, char *argv[]) {
     printf("=========================================\n");
-    printf("  PocketVideo - PS Vita Invidious Client \n");
+    printf("  PocketVideo - Invidious Video Client   \n");
     printf("  Target API: %s\n", INVIDIOUS_DEFAULT_HOST);
     printf("=========================================\n");
 
@@ -38,26 +36,24 @@ int main(int argc, char *argv[]) {
     sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
 #endif
 
-    // 1. Initialize Network Subsystem (sceNet, sceSsl, cURL)
+    // 1. Initialize Network Subsystem
     printf("[Main] Initializing network...\n");
     int net_err = net_init();
     if (net_err != 0) {
         snprintf(g_status_msg, sizeof(g_status_msg), "Network Init Failed (Error: 0x%08X)", net_err);
-        printf("[Main] ERROR: %s\n", g_status_msg);
     } else {
         g_network_ready = 1;
         snprintf(g_status_msg, sizeof(g_status_msg), "Network ready. Fetching trending...");
     }
 
-    // 2. Fetch Trending Videos from Invidious instance (https://invidious.f5.si/api/v1/trending)
+    // 2. Fetch Trending Videos from https://invidious.f5.si/api/v1/trending
     if (g_network_ready) {
         printf("[Main] Contacting %s/api/v1/trending...\n", INVIDIOUS_DEFAULT_HOST);
         int count = invidious_fetch_trending(INVIDIOUS_DEFAULT_HOST, &g_trending);
-
         if (count > 0) {
             snprintf(g_status_msg, sizeof(g_status_msg), "Trending loaded: %d videos", count);
             printf("\n--------------------------------------------------\n");
-            printf("  TRENDING VIDEOS ON INVIDIOUS (%s)\n", INVIDIOUS_DEFAULT_HOST);
+            printf("  TRENDING VIDEOS (%s)\n", INVIDIOUS_DEFAULT_HOST);
             printf("--------------------------------------------------\n");
             for (int i = 0; i < count; i++) {
                 char duration[16];
@@ -71,12 +67,11 @@ int main(int argc, char *argv[]) {
             }
             printf("--------------------------------------------------\n\n");
         } else {
-            snprintf(g_status_msg, sizeof(g_status_msg), "Fetch failed (Code: %d). Check Wi-Fi.", count);
-            printf("[Main] WARNING: Failed to fetch trending list. Error code: %d\n", count);
+            snprintf(g_status_msg, sizeof(g_status_msg), "Fetch failed (Code: %d). Check Connection.", count);
         }
     }
 
-    // 3. Initialize vita2d 2D Graphics Engine & Load Assets (Noto Sans + Textures)
+    // 3. Initialize 2D Graphics Engine & Load Assets (Noto Sans + Textures)
     ui_init();
 
     // 4. Main Event & Render Loop
@@ -87,13 +82,11 @@ int main(int argc, char *argv[]) {
         memset(&pad, 0, sizeof(pad));
         sceCtrlPeekBufferPositive(0, &pad, 1);
 
-        // Exit on START + SELECT
         if ((pad.buttons & SCE_CTRL_START) && (pad.buttons & SCE_CTRL_SELECT)) {
             running = 0;
             break;
         }
 
-        // Navigation controls
         if (g_current_view == VIEW_HOME_BUBBLES) {
             if (pad.buttons & SCE_CTRL_RIGHT) {
                 if (g_bubble_selected < 2) { g_bubble_selected++; sceKernelDelayThread(150000); }
@@ -123,37 +116,29 @@ int main(int argc, char *argv[]) {
         }
 #endif
 
-        // Render Frame
         vita2d_start_drawing();
         vita2d_clear_screen();
 
         // 1. Draw Textured Background
         ui_draw_background();
 
-        // 2. Draw 2012 PlayStation Vita Status Bar
-        ui_draw_status_bar("PocketVideo - Invidious Client");
+        // 2. Draw Status Bar
+        ui_draw_status_bar("PocketVideo");
 
         if (g_current_view == VIEW_HOME_BUBBLES) {
-            // LiveArea Bubble Grid Screen
-            ui_draw_text(300, 100, COLOR_TEXT_LIGHT, 24, "POCKETVIDEO LIVEAREA");
+            ui_draw_text(370, 100, COLOR_TEXT_LIGHT, 24, "POCKETVIDEO");
             ui_draw_text(260, 130, COLOR_TEXT_DIM, 15, "Select a category using D-Pad or Touch screen");
 
-            // Bubble 1: Trending Videos
+            // Bubbles with icons & glass overlays
             ui_draw_bubble_with_icon(280.0f, 280.0f, 54.0f, g_tex_icon_trending,
-                                     "Trending", COLOR_VITA_BLUE, 0, (g_bubble_selected == 0));
-
-            // Bubble 2: Search Videos
+                                     "Trending", COLOR_BRAND_BLUE, 0, (g_bubble_selected == 0));
             ui_draw_bubble_with_icon(480.0f, 280.0f, 54.0f, g_tex_icon_search,
-                                     "Search", COLOR_VITA_CYAN, 0, (g_bubble_selected == 1));
-
-            // Bubble 3: Instance Settings
+                                     "Search", COLOR_BRAND_CYAN, 0, (g_bubble_selected == 1));
             ui_draw_bubble_with_icon(680.0f, 280.0f, 54.0f, g_tex_icon_settings,
                                      "Instance", RGBA8(180, 80, 220, 255), 0, (g_bubble_selected == 2));
 
-            // Hint
-            ui_draw_text(330, 480, COLOR_HIGHLIGHT_AMBER, 16, "Press CROSS to enter Trending feed");
+            ui_draw_text(340, 480, COLOR_HIGHLIGHT_AMBER, 16, "Press CROSS to enter Trending feed");
         } else if (g_current_view == VIEW_TRENDING_LIST) {
-            // Video List View
             if (g_trending.count > 0) {
                 float start_y = 44.0f;
                 float card_h = 84.0f;
@@ -174,8 +159,8 @@ int main(int argc, char *argv[]) {
             }
         }
 
-        // 3. Draw Peelable LiveArea tab
-        ui_draw_livearea_peel(0.0f);
+        // 3. Draw Corner Tab
+        ui_draw_corner_tab(0.0f);
 
         vita2d_end_drawing();
         vita2d_wait_rendering_done();

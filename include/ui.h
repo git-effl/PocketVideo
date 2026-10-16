@@ -13,15 +13,28 @@ extern "C" {
 #define SCREEN_WIDTH  960
 #define SCREEN_HEIGHT 544
 
-// Authentic 2010s PS Vita color palette
-#define COLOR_VITA_BLUE       RGBA8(0, 114, 206, 255)
-#define COLOR_VITA_CYAN       RGBA8(0, 174, 239, 255)
-#define COLOR_VITA_NAVY       RGBA8(10, 22, 44, 255)
-#define COLOR_VITA_GLASS      RGBA8(255, 255, 255, 45)
+// PocketVideo 2010s tactile console color palette
+#define COLOR_BRAND_BLUE      RGBA8(0, 114, 206, 255)
+#define COLOR_BRAND_CYAN      RGBA8(0, 174, 239, 255)
+#define COLOR_BRAND_NAVY      RGBA8(10, 22, 44, 255)
+#define COLOR_GLASS_SHEEN     RGBA8(255, 255, 255, 45)
 #define COLOR_BUBBLE_SHADOW   RGBA8(0, 0, 0, 110)
 #define COLOR_TEXT_LIGHT      RGBA8(245, 245, 248, 255)
 #define COLOR_TEXT_DIM        RGBA8(170, 180, 200, 255)
 #define COLOR_HIGHLIGHT_AMBER RGBA8(255, 175, 20, 255)
+
+// Aliases for compatibility
+#define COLOR_VITA_BLUE COLOR_BRAND_BLUE
+#define COLOR_VITA_CYAN COLOR_BRAND_CYAN
+#define COLOR_VITA_NAVY COLOR_BRAND_NAVY
+
+typedef enum {
+    VIEW_HOME_BUBBLES = 0,
+    VIEW_TRENDING_LIST,
+    VIEW_SEARCH,
+    VIEW_PLAYER,
+    VIEW_SETTINGS
+} AppView;
 
 // Global asset texture pointers
 extern vita2d_texture *g_tex_bg;
@@ -37,35 +50,34 @@ extern vita2d_font *g_font_noto;
 extern vita2d_pvf  *g_font_pvf_fallback;
 
 /**
- * Initialize 2D graphics subsystem (vita2d), load Noto Sans font,
+ * Initialize 2D graphics subsystem, load Noto Sans font,
  * and load all UI PNG textures from app0:assets/.
- * Returns 0 on success, negative error code on failure.
  */
 int ui_init(void);
 
 /**
- * Free all textures, fonts, and shutdown vita2d.
+ * Free all textures, fonts, and shutdown graphics.
  */
 void ui_term(void);
 
 /**
- * Draw background wallpaper using app0:assets/textures/livearea_bg.png
+ * Draw background wallpaper using app0:assets/textures/bg.png
  */
 void ui_draw_background(void);
 
 /**
- * Unified text drawing helper: uses Noto Sans (vita2d_font) if available,
- * otherwise falls back to system PVF font.
+ * Unified text drawing helper: uses Noto Sans font if available,
+ * otherwise falls back to system font.
  */
 void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const char *text);
 
 /**
- * Render the top status bar (Vita clock, battery status, Wi-Fi icon).
+ * Render the top status bar (Clock, battery status, Wi-Fi icon).
  */
 void ui_draw_status_bar(const char *title);
 
 /**
- * Render an authentic 2012 tactile glossy bubble with embedded icon & glass reflection.
+ * Render a tactile glossy bubble with embedded icon & glass reflection.
  */
 void ui_draw_bubble_with_icon(float cx, float cy, float radius,
                               vita2d_texture *icon, const char *title,
@@ -77,9 +89,12 @@ void ui_draw_bubble_with_icon(float cx, float cy, float radius,
 void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *item, int is_focused);
 
 /**
- * Render the peelable LiveArea paper tab in the top-right corner.
+ * Render the tactile corner page tab in the top-right corner.
  */
-void ui_draw_livearea_peel(float peel_progress);
+void ui_draw_corner_tab(float peel_progress);
+
+// Alias for backwards compatibility
+#define ui_draw_livearea_peel ui_draw_corner_tab
 
 #ifdef __cplusplus
 }

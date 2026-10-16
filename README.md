@@ -1,64 +1,69 @@
-# PocketVideo (PS Vita Invidious Client)
+# PocketVideo
 
-A homebrew video client front-end for the Sony PlayStation Vita that streams from public Invidious API instances (defaulting to `https://invidious.f5.si`). Designed with an authentic 2010s tactile LiveArea user interface featuring glossy bubbles, curved tabs, and textured layouts.
+A dedicated video client front-end that streams videos directly from public Invidious API instances (defaulting to `https://invidious.f5.si`). Designed with a classic 2010s tactile console user interface featuring glossy bubbles, corner tabs, and textured layouts.
 
 ## Recommended Tech Stack
-- **Toolchain**: [VitaSDK](https://vitasdk.org/) (`arm-vita-eabi-gcc`)
-- **2D Graphics & UI**: `vita2dlib` (`libvita2d`) hardware-accelerated GXM graphics at 960x544 native OLED resolution.
+- **Toolchain**: C99 Cross-Compiler (`arm-vita-eabi-gcc` or standard embedded GCC toolchain)
+- **2D Graphics & UI**: `vita2dlib` hardware-accelerated 2D graphics at 960x544 native OLED resolution.
+- **Typography**: Google Fonts **Noto Sans** TrueType font (`assets/fonts/NotoSans-Regular.ttf`) loaded via FreeType.
 - **Networking**: `libcurl` with `mbedtls` for HTTPS/TLS requests with timeout handling and redirect support.
-- **JSON Parser**: `cJSON` (fast, lightweight memory footprint for embedded ARM Cortex-A9).
-- **Video Decoding**: Hardware-accelerated `sceAvPlayer` (H.264 up to 720p/1080i with AAC audio).
-- **Controls**: `sceCtrl` for physical buttons / analog sticks and `sceTouch` for capacitive front touchscreen.
+- **JSON Parser**: `cJSON` (fast, lightweight memory footprint for embedded systems).
+- **Video Decoding**: Hardware-accelerated `sceAvPlayer` (H.264 up to 720p with AAC audio).
+- **Controls**: Physical D-Pad, action buttons, and front capacitive touchscreen.
 
 ## Project Structure
 ```
 PocketVideo/
-├── CMakeLists.txt              # CMake build configuration for VitaSDK
+├── CMakeLists.txt              # CMake build configuration
 ├── Makefile                    # Direct Makefile compilation alternative
 ├── README.md                   # Project documentation & build guide
+├── LICENSE                     # BSD 3-Clause License
 ├── include/
 │   ├── invidious.h             # Invidious API types & endpoints
 │   ├── network.h               # libcurl network & SSL wrapper
-│   └── ui.h                    # vita2d classic tactile UI definitions
+│   └── ui.h                    # 2010s tactile UI definitions
 ├── src/
 │   ├── main.c                  # App entry point, event loop & input handling
 │   ├── invidious.c             # cJSON parsing for /api/v1/trending & search
-│   ├── network.c               # Vita network/SSL initialization & curl requests
-│   └── ui.c                    # 2012 Vita bubble, bevel, & LiveArea rendering
-├── assets/                     # Runtime UI textures & sound assets
-│   ├── fonts/                  # Custom TTF/PVF fonts
-│   ├── sounds/                 # Authentic 2012 tactile click sounds
-│   └── textures/
-│       ├── bubble_glass.png    # Skeuomorphic gloss overlay
-│       ├── livearea_bg.png     # Textured Vita wallpaper
-│       └── icon_play.png       # Media player icon
-└── sce_sys/                    # PlayStation Vita LiveArea metadata
-    ├── icon0.png               # 128x128 app icon on Vita LiveArea
-    ├── livearea/
-    │   └── contents/
-    │       ├── bg.png          # 840x500 LiveArea background screen
-    │       ├── startup.png     # 280x158 Gate startup button
-    │       └── template.xml    # LiveArea layout template definition
-    └── param.sfo               # Generated title info (TITLE_ID=PKTV00001)
+│   ├── network.c               # Network initialization & curl requests
+│   └── ui.c                    # Bubble, bevel, & tactile rendering
+├── assets/                     # Custom UI textures, icons, & sounds (CC0)
+│   ├── LICENSE                 # Creative Commons Zero 1.0 Universal
+│   ├── fonts/
+│   │   └── NotoSans-Regular.ttf# Noto Sans TrueType font
+│   ├── icons/
+│   │   ├── trending.png        # 64x64 flame glyph
+│   │   ├── search.png          # 64x64 search glass glyph
+│   │   ├── settings.png        # 64x64 gear glyph
+│   │   ├── play.png            # 32x32 play arrow glyph
+│   │   └── pause.png           # 32x32 pause glyph
+│   ├── textures/
+│   │   ├── bg.png              # 960x544 textured wallpaper
+│   │   └── bubble_glass.png    # Skeuomorphic gloss overlay
+│   └── sounds/
+│       ├── bubble_pop.wav      # Tactile click sound
+│       └── peel.wav            # Corner tab sound
+└── sce_sys/                    # Application package metadata
+    ├── icon0.png               # 128x128 app icon
+    └── livearea/contents/
+        ├── bg.png              # 840x500 portal background
+        ├── startup.png         # 280x158 startup button
+        └── template.xml        # Portal layout definition
 ```
 
 ## How to Build
 
-### Using VitaSDK
-Make sure `VITASDK` environment variable is set:
+### Using Docker
 ```bash
-export VITASDK=/usr/local/vitasdk
-export PATH=$VITASDK/bin:$PATH
+docker run --rm -v $(pwd):/build vitasdk/vitasdk /bin/bash -c "cd /build && mkdir -p build && cd build && cmake .. && make"
+```
 
-# Using CMake:
+### Using Local SDK
+```bash
 mkdir build && cd build
 cmake ..
 make
-
-# Or using Makefile:
-make
 ```
-This generates `PocketVideo.vpk`, which can be transferred to your PS Vita via VitaShell (FTP or USB).
 
 ### Testing with Invidious Endpoint
 PocketVideo queries `https://invidious.f5.si/api/v1/trending` by default. You can test the endpoint directly using curl:
