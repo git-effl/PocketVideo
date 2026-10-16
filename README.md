@@ -27,16 +27,10 @@ PocketVideo/
 │   ├── invidious.c             # cJSON parsing for /api/v1/trending & search
 │   ├── network.c               # Network initialization & curl requests
 │   └── ui.c                    # Bubble, bevel, & tactile rendering
-├── assets/                     # Custom UI textures, icons, & sounds (CC0)
+├── assets/                     # Custom UI textures & sounds (CC0)
 │   ├── LICENSE                 # Creative Commons Zero 1.0 Universal
 │   ├── fonts/
 │   │   └── NotoSans-Regular.ttf# Noto Sans TrueType font
-│   ├── icons/
-│   │   ├── trending.png        # 64x64 flame glyph
-│   │   ├── search.png          # 64x64 search glass glyph
-│   │   ├── settings.png        # 64x64 gear glyph
-│   │   ├── play.png            # 32x32 play arrow glyph
-│   │   └── pause.png           # 32x32 pause glyph
 │   ├── textures/
 │   │   ├── bg.png              # 960x544 textured wallpaper
 │   │   └── bubble_glass.png    # Skeuomorphic gloss overlay

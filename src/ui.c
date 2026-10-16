@@ -3,17 +3,12 @@
 #include <string.h>
 
 // Global asset texture pointers
-vita2d_texture *g_tex_bg             = NULL;
-vita2d_texture *g_tex_bubble_glass   = NULL;
-vita2d_texture *g_tex_icon_trending  = NULL;
-vita2d_texture *g_tex_icon_search    = NULL;
-vita2d_texture *g_tex_icon_settings  = NULL;
-vita2d_texture *g_tex_icon_play      = NULL;
-vita2d_texture *g_tex_icon_pause     = NULL;
+vita2d_texture *g_tex_bg           = NULL;
+vita2d_texture *g_tex_bubble_glass = NULL;
 
 // Global typography pointers
-vita2d_font *g_font_noto             = NULL;
-vita2d_pvf  *g_font_pvf_fallback     = NULL;
+vita2d_font *g_font_noto           = NULL;
+vita2d_pvf  *g_font_pvf_fallback   = NULL;
 
 int ui_init(void) {
     vita2d_init();
@@ -32,29 +27,14 @@ int ui_init(void) {
         g_font_pvf_fallback = vita2d_load_default_pvf();
     }
 
-    // 2. Load UI Textures & Icons (using bg.png)
+    // 2. Load UI Textures (bg.png & bubble_glass.png)
     g_tex_bg = vita2d_load_PNG_file("app0:assets/textures/bg.png");
     if (!g_tex_bg) g_tex_bg = vita2d_load_PNG_file("assets/textures/bg.png");
 
     g_tex_bubble_glass = vita2d_load_PNG_file("app0:assets/textures/bubble_glass.png");
     if (!g_tex_bubble_glass) g_tex_bubble_glass = vita2d_load_PNG_file("assets/textures/bubble_glass.png");
 
-    g_tex_icon_trending = vita2d_load_PNG_file("app0:assets/icons/trending.png");
-    if (!g_tex_icon_trending) g_tex_icon_trending = vita2d_load_PNG_file("assets/icons/trending.png");
-
-    g_tex_icon_search = vita2d_load_PNG_file("app0:assets/icons/search.png");
-    if (!g_tex_icon_search) g_tex_icon_search = vita2d_load_PNG_file("assets/icons/search.png");
-
-    g_tex_icon_settings = vita2d_load_PNG_file("app0:assets/icons/settings.png");
-    if (!g_tex_icon_settings) g_tex_icon_settings = vita2d_load_PNG_file("assets/icons/settings.png");
-
-    g_tex_icon_play = vita2d_load_PNG_file("app0:assets/icons/play.png");
-    if (!g_tex_icon_play) g_tex_icon_play = vita2d_load_PNG_file("assets/icons/play.png");
-
-    g_tex_icon_pause = vita2d_load_PNG_file("app0:assets/icons/pause.png");
-    if (!g_tex_icon_pause) g_tex_icon_pause = vita2d_load_PNG_file("assets/icons/pause.png");
-
-    printf("[UI] Engine initialized at 960x544 with custom assets.\n");
+    printf("[UI] Engine initialized at 960x544 with tactile textures.\n");
     return 0;
 }
 
@@ -64,11 +44,6 @@ void ui_term(void) {
 
     if (g_tex_bg)            { vita2d_free_texture(g_tex_bg);            g_tex_bg = NULL; }
     if (g_tex_bubble_glass)  { vita2d_free_texture(g_tex_bubble_glass);  g_tex_bubble_glass = NULL; }
-    if (g_tex_icon_trending) { vita2d_free_texture(g_tex_icon_trending); g_tex_icon_trending = NULL; }
-    if (g_tex_icon_search)   { vita2d_free_texture(g_tex_icon_search);   g_tex_icon_search = NULL; }
-    if (g_tex_icon_settings) { vita2d_free_texture(g_tex_icon_settings); g_tex_icon_settings = NULL; }
-    if (g_tex_icon_play)     { vita2d_free_texture(g_tex_icon_play);     g_tex_icon_play = NULL; }
-    if (g_tex_icon_pause)    { vita2d_free_texture(g_tex_icon_pause);    g_tex_icon_pause = NULL; }
 
     vita2d_fini();
 }
@@ -111,29 +86,21 @@ void ui_draw_status_bar(const char *title) {
     vita2d_draw_rectangle(929, 13, 3, 6, RGBA8(255, 255, 255, 180));
 }
 
-void ui_draw_bubble_with_icon(float cx, float cy, float radius,
-                              vita2d_texture *icon, const char *title,
-                              unsigned int base_col, int is_pressed, int is_selected) {
+void ui_draw_bubble(float cx, float cy, float radius, const char *title,
+                    unsigned int base_col, int is_pressed, int is_selected) {
     float r = radius;
     if (is_pressed) {
         r *= 0.94f;
         cy += 2.0f;
     }
 
-    // Drop shadow
+    // 1. Drop shadow
     vita2d_draw_fill_circle(cx + 3, cy + 6, r + 2, COLOR_BUBBLE_SHADOW);
 
-    // Sphere base
+    // 2. Sphere base
     vita2d_draw_fill_circle(cx, cy, r, base_col);
 
-    // Center icon
-    if (icon) {
-        float iw = (float)vita2d_texture_get_width(icon);
-        float ih = (float)vita2d_texture_get_height(icon);
-        vita2d_draw_texture(icon, cx - (iw / 2.0f), cy - (ih / 2.0f));
-    }
-
-    // Glass specular overlay texture
+    // 3. Glass specular overlay texture
     if (g_tex_bubble_glass) {
         float gw = (float)vita2d_texture_get_width(g_tex_bubble_glass);
         float scale = (r * 2.0f) / gw;
@@ -142,12 +109,12 @@ void ui_draw_bubble_with_icon(float cx, float cy, float radius,
         vita2d_draw_fill_circle(cx - (r * 0.22f), cy - (r * 0.25f), r * 0.42f, COLOR_GLASS_SHEEN);
     }
 
-    // Selected rim
+    // 4. Selected rim
     if (is_selected) {
         vita2d_draw_line(cx - r - 4, cy, cx + r + 4, cy, COLOR_HIGHLIGHT_AMBER);
     }
 
-    // Text label
+    // 5. Text label
     if (title) {
         float text_x = cx - (float)(strlen(title) * 4.5f);
         ui_draw_text(text_x, cy + r + 24.0f, COLOR_TEXT_LIGHT, 16, title);
@@ -166,19 +133,18 @@ void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *ite
     vita2d_draw_line(x, y, x, y + h, border_col);
     vita2d_draw_line(x + w, y, x + w, y + h, border_col);
 
+    // Thumbnail container box
     float thumb_w = 120.0f;
     float thumb_h = 68.0f;
     vita2d_draw_rectangle(x + 8, y + 8, thumb_w, thumb_h, RGBA8(4, 8, 14, 255));
 
-    if (g_tex_icon_play) {
-        vita2d_draw_texture(g_tex_icon_play, x + 8 + (thumb_w / 2.0f) - 16, y + 8 + (thumb_h / 2.0f) - 16);
-    }
-
+    // Duration badge
     char dur[16];
     format_duration(item->length_seconds, dur, sizeof(dur));
     vita2d_draw_rectangle(x + thumb_w - 42, y + thumb_h - 10, 46, 16, RGBA8(0, 0, 0, 220));
     ui_draw_text(x + thumb_w - 38, y + thumb_h + 3, COLOR_TEXT_LIGHT, 12, dur);
 
+    // Title & channel metadata
     char truncated_title[60];
     snprintf(truncated_title, sizeof(truncated_title), "%.50s%s", item->title, strlen(item->title) > 50 ? "..." : "");
     ui_draw_text(x + thumb_w + 18, y + 26, is_focused ? COLOR_BRAND_CYAN : COLOR_TEXT_LIGHT, 17, truncated_title);

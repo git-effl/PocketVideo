@@ -129,13 +129,10 @@ int main(int argc, char *argv[]) {
             ui_draw_text(370, 100, COLOR_TEXT_LIGHT, 24, "POCKETVIDEO");
             ui_draw_text(260, 130, COLOR_TEXT_DIM, 15, "Select a category using D-Pad or Touch screen");
 
-            // Bubbles with icons & glass overlays
-            ui_draw_bubble_with_icon(280.0f, 280.0f, 54.0f, g_tex_icon_trending,
-                                     "Trending", COLOR_BRAND_BLUE, 0, (g_bubble_selected == 0));
-            ui_draw_bubble_with_icon(480.0f, 280.0f, 54.0f, g_tex_icon_search,
-                                     "Search", COLOR_BRAND_CYAN, 0, (g_bubble_selected == 1));
-            ui_draw_bubble_with_icon(680.0f, 280.0f, 54.0f, g_tex_icon_settings,
-                                     "Instance", RGBA8(180, 80, 220, 255), 0, (g_bubble_selected == 2));
+            // Tactile 3D bubbles with glass highlights
+            ui_draw_bubble(280.0f, 280.0f, 54.0f, "Trending", COLOR_BRAND_BLUE, 0, (g_bubble_selected == 0));
+            ui_draw_bubble(480.0f, 280.0f, 54.0f, "Search", COLOR_BRAND_CYAN, 0, (g_bubble_selected == 1));
+            ui_draw_bubble(680.0f, 280.0f, 54.0f, "Instance", RGBA8(180, 80, 220, 255), 0, (g_bubble_selected == 2));
 
             ui_draw_text(340, 480, COLOR_HIGHLIGHT_AMBER, 16, "Press CROSS to enter Trending feed");
         } else if (g_current_view == VIEW_TRENDING_LIST) {

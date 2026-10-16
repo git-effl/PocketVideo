@@ -39,11 +39,6 @@ typedef enum {
 // Global asset texture pointers
 extern vita2d_texture *g_tex_bg;
 extern vita2d_texture *g_tex_bubble_glass;
-extern vita2d_texture *g_tex_icon_trending;
-extern vita2d_texture *g_tex_icon_search;
-extern vita2d_texture *g_tex_icon_settings;
-extern vita2d_texture *g_tex_icon_play;
-extern vita2d_texture *g_tex_icon_pause;
 
 // Global typography pointers
 extern vita2d_font *g_font_noto;
@@ -51,7 +46,7 @@ extern vita2d_pvf  *g_font_pvf_fallback;
 
 /**
  * Initialize 2D graphics subsystem, load Noto Sans font,
- * and load all UI PNG textures from app0:assets/.
+ * and load UI textures (bg.png, bubble_glass.png) from app0:assets/.
  */
 int ui_init(void);
 
@@ -72,19 +67,18 @@ void ui_draw_background(void);
 void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const char *text);
 
 /**
- * Render the top status bar (Clock, battery status, Wi-Fi icon).
+ * Render the top status bar (Clock, battery status, Wi-Fi indicator).
  */
 void ui_draw_status_bar(const char *title);
 
 /**
- * Render a tactile glossy bubble with embedded icon & glass reflection.
+ * Render a tactile glossy bubble with glass reflection and drop shadow.
  */
-void ui_draw_bubble_with_icon(float cx, float cy, float radius,
-                              vita2d_texture *icon, const char *title,
-                              unsigned int base_col, int is_pressed, int is_selected);
+void ui_draw_bubble(float cx, float cy, float radius, const char *title,
+                    unsigned int base_col, int is_pressed, int is_selected);
 
 /**
- * Render a video card in the trending list view using loaded play icon.
+ * Render a video card in the trending list view.
  */
 void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *item, int is_focused);
 
@@ -92,9 +86,6 @@ void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *ite
  * Render the tactile corner page tab in the top-right corner.
  */
 void ui_draw_corner_tab(float peel_progress);
-
-// Alias for backwards compatibility
-#define ui_draw_livearea_peel ui_draw_corner_tab
 
 #ifdef __cplusplus
 }

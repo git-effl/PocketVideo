@@ -64,11 +64,6 @@ vita_create_vpk(PocketVideo.vpk "PKTV00001" eboot.bin
   FILE assets/fonts/NotoSans-Regular.ttf assets/fonts/NotoSans-Regular.ttf
   FILE assets/textures/bg.png assets/textures/bg.png
   FILE assets/textures/bubble_glass.png assets/textures/bubble_glass.png
-  FILE assets/icons/trending.png assets/icons/trending.png
-  FILE assets/icons/search.png assets/icons/search.png
-  FILE assets/icons/settings.png assets/icons/settings.png
-  FILE assets/icons/play.png assets/icons/play.png
-  FILE assets/icons/pause.png assets/icons/pause.png
   FILE assets/sounds/bubble_pop.wav assets/sounds/bubble_pop.wav
   FILE assets/sounds/peel.wav assets/sounds/peel.wav
 )
