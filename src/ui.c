@@ -136,7 +136,7 @@ void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *ite
     snprintf(truncated_title, sizeof(truncated_title), "%.48s%s", item->title, strlen(item->title) > 48 ? "..." : "");
     ui_draw_text(x + thumb_w + 18, y + 26, is_focused ? COLOR_BRAND_CYAN : COLOR_TEXT_LIGHT, 17, truncated_title);
 
-    char meta_info[128];
+    char meta_info[256];
     snprintf(meta_info, sizeof(meta_info), "%s  *  %lld views  *  %s",
              item->author, item->view_count, item->published_text);
     ui_draw_text(x + thumb_w + 18, y + 52, COLOR_TEXT_DIM, 14, meta_info);
@@ -195,7 +195,7 @@ void ui_draw_description_modal(const VideoItem *item) {
     ui_draw_text(mx + 24, my + 76, COLOR_TEXT_LIGHT, 17, truncated_title);
 
     // Channel & metadata
-    char meta[160];
+    char meta[256];
     snprintf(meta, sizeof(meta), "Channel: %s   |   Views: %lld   |   Published: %s",
              item->author, item->view_count, item->published_text);
     ui_draw_text(mx + 24, my + 104, COLOR_HIGHLIGHT_AMBER, 14, meta);

@@ -28,19 +28,21 @@ add_executable(pocketvideo ${SOURCES})
 target_link_libraries(pocketvideo
   vita2d
   freetype
+  bz2
   png
   jpeg
   z
   curl
-  mbedtls
-  mbedx509
-  mbedcrypto
+  ssl
+  crypto
+  zstd
   SceLibKernel_stub
   SceDisplay_stub
   SceGxm_stub
   SceCtrl_stub
   SceTouch_stub
   ScePgf_stub
+  ScePvf_stub
   SceCommonDialog_stub
   SceNet_stub
   SceNetCtl_stub
