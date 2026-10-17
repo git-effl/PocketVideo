@@ -82,11 +82,16 @@ int main(int argc, char *argv[]) {
         memset(&pad, 0, sizeof(pad));
         sceCtrlPeekBufferPositive(0, &pad, 1);
 
+        SceTouchData touch;
+        memset(&touch, 0, sizeof(touch));
+        sceTouchPeek(SCE_TOUCH_PORT_FRONT, &touch, 1);
+
         if ((pad.buttons & SCE_CTRL_START) && (pad.buttons & SCE_CTRL_SELECT)) {
             running = 0;
             break;
         }
 
+        // 1. Physical Controller Buttons
         if (g_current_view == VIEW_HOME_BUBBLES) {
             if (pad.buttons & SCE_CTRL_RIGHT) {
                 if (g_bubble_selected < 2) { g_bubble_selected++; sceKernelDelayThread(150000); }
@@ -110,8 +115,89 @@ int main(int argc, char *argv[]) {
             } else if (pad.buttons & SCE_CTRL_CIRCLE) {
                 g_current_view = VIEW_HOME_BUBBLES;
                 sceKernelDelayThread(200000);
+            } else if (pad.buttons & SCE_CTRL_SQUARE) {
+                // View Description Modal
+                if (g_trending.count > 0) {
+                    g_current_view = VIEW_MODAL_DESCRIPTION;
+                    sceKernelDelayThread(200000);
+                }
             } else if (pad.buttons & SCE_CTRL_TRIANGLE) {
-                invidious_fetch_trending(INVIDIOUS_DEFAULT_HOST, &g_trending);
+                // View Channel Info Modal
+                if (g_trending.count > 0) {
+                    g_current_view = VIEW_MODAL_CHANNEL;
+                    sceKernelDelayThread(200000);
+                }
+            } else if (pad.buttons & SCE_CTRL_CROSS) {
+                // Play Video
+                printf("[Main] Playing video: [%s] %s\n",
+                       g_trending.items[g_selected_index].id,
+                       g_trending.items[g_selected_index].title);
+            }
+        } else if (g_current_view == VIEW_MODAL_DESCRIPTION || g_current_view == VIEW_MODAL_CHANNEL) {
+            if (pad.buttons & (SCE_CTRL_CIRCLE | SCE_CTRL_SQUARE | SCE_CTRL_TRIANGLE)) {
+                g_current_view = VIEW_TRENDING_LIST;
+                sceKernelDelayThread(200000);
+            } else if (pad.buttons & SCE_CTRL_CROSS) {
+                // Play from modal
+                g_current_view = VIEW_TRENDING_LIST;
+                sceKernelDelayThread(200000);
+            }
+        }
+
+        // 2. Front Touchscreen Tap Handling
+        if (touch.reportNum > 0) {
+            float tx = (float)touch.report[0].x * (960.0f / 1920.0f);
+            float ty = (float)touch.report[0].y * (544.0f / 1088.0f);
+
+            if (g_current_view == VIEW_HOME_BUBBLES) {
+                if (ty >= 220.0f && ty <= 340.0f) {
+                    if (tx >= 220.0f && tx <= 340.0f) {
+                        g_bubble_selected = 0;
+                        g_current_view = VIEW_TRENDING_LIST;
+                        sceKernelDelayThread(200000);
+                    } else if (tx >= 420.0f && tx <= 540.0f) {
+                        g_bubble_selected = 1;
+                        sceKernelDelayThread(200000);
+                    } else if (tx >= 620.0f && tx <= 740.0f) {
+                        g_bubble_selected = 2;
+                        sceKernelDelayThread(200000);
+                    }
+                }
+            } else if (g_current_view == VIEW_TRENDING_LIST) {
+                float start_y = 44.0f;
+                float card_h = 84.0f;
+                int visible_items = 5;
+                int offset = g_selected_index - 2;
+                if (offset < 0) offset = 0;
+                if (offset > g_trending.count - visible_items) offset = g_trending.count - visible_items;
+                if (offset < 0) offset = 0;
+
+                for (int i = 0; i < visible_items && (offset + i) < g_trending.count; i++) {
+                    float cy = start_y + (i * (card_h + 8.0f));
+                    if (ty >= cy && ty <= (cy + card_h)) {
+                        int tapped_idx = offset + i;
+                        g_selected_index = tapped_idx;
+
+                        // Check if tapped on [■] Description button (715px - 817px)
+                        if (tx >= 715.0f && tx <= 817.0f) {
+                            g_current_view = VIEW_MODAL_DESCRIPTION;
+                            sceKernelDelayThread(200000);
+                            break;
+                        }
+                        // Check if tapped on [▲] Channel button (825px - 927px)
+                        else if (tx >= 825.0f && tx <= 927.0f) {
+                            g_current_view = VIEW_MODAL_CHANNEL;
+                            sceKernelDelayThread(200000);
+                            break;
+                        }
+                    }
+                }
+            } else if (g_current_view == VIEW_MODAL_DESCRIPTION || g_current_view == VIEW_MODAL_CHANNEL) {
+                // Tapping outside modal or close button closes modal
+                if (ty >= 420.0f || ty <= 75.0f || tx <= 120.0f || tx >= 840.0f) {
+                    g_current_view = VIEW_TRENDING_LIST;
+                    sceKernelDelayThread(200000);
+                }
             }
         }
 #endif
@@ -129,13 +215,13 @@ int main(int argc, char *argv[]) {
             ui_draw_text(370, 100, COLOR_TEXT_LIGHT, 24, "POCKETVIDEO");
             ui_draw_text(260, 130, COLOR_TEXT_DIM, 15, "Select a category using D-Pad or Touch screen");
 
-            // Tactile 3D bubbles with glass highlights
             ui_draw_bubble(280.0f, 280.0f, 54.0f, "Trending", COLOR_BRAND_BLUE, 0, (g_bubble_selected == 0));
             ui_draw_bubble(480.0f, 280.0f, 54.0f, "Search", COLOR_BRAND_CYAN, 0, (g_bubble_selected == 1));
             ui_draw_bubble(680.0f, 280.0f, 54.0f, "Instance", RGBA8(180, 80, 220, 255), 0, (g_bubble_selected == 2));
 
             ui_draw_text(340, 480, COLOR_HIGHLIGHT_AMBER, 16, "Press CROSS to enter Trending feed");
-        } else if (g_current_view == VIEW_TRENDING_LIST) {
+        } else {
+            // Render Trending list
             if (g_trending.count > 0) {
                 float start_y = 44.0f;
                 float card_h = 84.0f;
@@ -153,6 +239,16 @@ int main(int argc, char *argv[]) {
                 }
             } else {
                 ui_draw_text(360, 270, COLOR_TEXT_LIGHT, 18, g_status_msg);
+            }
+
+            // Draw Description Modal overlay if open
+            if (g_current_view == VIEW_MODAL_DESCRIPTION && g_trending.count > 0) {
+                ui_draw_description_modal(&g_trending.items[g_selected_index]);
+            }
+
+            // Draw Channel Info Modal overlay if open
+            if (g_current_view == VIEW_MODAL_CHANNEL && g_trending.count > 0) {
+                ui_draw_channel_modal(&g_trending.items[g_selected_index]);
             }
         }
 

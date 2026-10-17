@@ -33,7 +33,9 @@ typedef enum {
     VIEW_TRENDING_LIST,
     VIEW_SEARCH,
     VIEW_PLAYER,
-    VIEW_SETTINGS
+    VIEW_SETTINGS,
+    VIEW_MODAL_DESCRIPTION,
+    VIEW_MODAL_CHANNEL
 } AppView;
 
 // Global asset texture pointers
@@ -78,9 +80,19 @@ void ui_draw_bubble(float cx, float cy, float radius, const char *title,
                     unsigned int base_col, int is_pressed, int is_selected);
 
 /**
- * Render a video card in the trending list view.
+ * Render a video card in the trending list view with action button badges.
  */
 void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *item, int is_focused);
+
+/**
+ * Render tactile modal dialog showing multi-line video description.
+ */
+void ui_draw_description_modal(const VideoItem *item);
+
+/**
+ * Render tactile modal dialog showing channel metadata & author profile.
+ */
+void ui_draw_channel_modal(const VideoItem *item);
 
 /**
  * Render the tactile corner page tab in the top-right corner.
