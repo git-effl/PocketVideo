@@ -20,6 +20,7 @@ set(SOURCES
   src/network.c
   src/invidious.c
   src/ui.c
+  src/cJSON.c
 )
 
 add_executable(pocketvideo ${SOURCES})
@@ -34,7 +35,6 @@ target_link_libraries(pocketvideo
   mbedtls
   mbedx509
   mbedcrypto
-  cjson
   SceLibKernel_stub
   SceDisplay_stub
   SceGxm_stub

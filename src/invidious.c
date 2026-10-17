@@ -3,7 +3,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <cjson/cJSON.h>
+#if defined(__has_include)
+  #if __has_include("cJSON.h")
+    #include "cJSON.h"
+  #elif __has_include(<cjson/cJSON.h>)
+    #include <cjson/cJSON.h>
+  #elif __has_include(<cJSON.h>)
+    #include <cJSON.h>
+  #else
+    #include "cJSON.h"
+  #endif
+#else
+  #include "cJSON.h"
+#endif
 
 void format_duration(int seconds, char *buffer, size_t max_len) {
     if (!buffer || max_len == 0) return;
