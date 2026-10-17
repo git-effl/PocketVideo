@@ -178,13 +178,13 @@ int main(int argc, char *argv[]) {
                         int tapped_idx = offset + i;
                         g_selected_index = tapped_idx;
 
-                        // Check if tapped on [■] Description button (715px - 817px)
+                        // Check if tapped on Description button (Square, 715px - 817px)
                         if (tx >= 715.0f && tx <= 817.0f) {
                             g_current_view = VIEW_MODAL_DESCRIPTION;
                             sceKernelDelayThread(200000);
                             break;
                         }
-                        // Check if tapped on [▲] Channel button (825px - 927px)
+                        // Check if tapped on Channel button (Triangle, 825px - 927px)
                         else if (tx >= 825.0f && tx <= 927.0f) {
                             g_current_view = VIEW_MODAL_CHANNEL;
                             sceKernelDelayThread(200000);

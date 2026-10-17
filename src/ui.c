@@ -142,7 +142,7 @@ void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *ite
     ui_draw_text(x + thumb_w + 18, y + 52, COLOR_TEXT_DIM, 14, meta_info);
 
     // Description & Channel tactile button badges
-    // [■] Description button badge
+    // Description button badge (Square button)
     unsigned int desc_btn_bg = is_focused ? RGBA8(236, 72, 153, 230) : RGBA8(180, 50, 115, 160);
     unsigned int desc_btn_border = is_focused ? RGBA8(255, 120, 190, 255) : RGBA8(130, 40, 85, 200);
     vita2d_draw_rectangle(x + w - 225, y + 24, 102, 28, desc_btn_bg);
@@ -150,9 +150,9 @@ void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *ite
     vita2d_draw_line(x + w - 225, y + 52, x + w - 123, y + 52, desc_btn_border);
     vita2d_draw_line(x + w - 225, y + 24, x + w - 225, y + 52, desc_btn_border);
     vita2d_draw_line(x + w - 123, y + 24, x + w - 123, y + 52, desc_btn_border);
-    ui_draw_text(x + w - 216, y + 43, COLOR_TEXT_LIGHT, 12, "[■] Description");
+    ui_draw_text(x + w - 212, y + 43, COLOR_TEXT_LIGHT, 12, "Description");
 
-    // [▲] Channel button badge
+    // Channel button badge (Triangle button)
     unsigned int chan_btn_bg = is_focused ? RGBA8(16, 185, 129, 230) : RGBA8(12, 130, 90, 160);
     unsigned int chan_btn_border = is_focused ? RGBA8(52, 211, 153, 255) : RGBA8(10, 95, 68, 200);
     vita2d_draw_rectangle(x + w - 115, y + 24, 102, 28, chan_btn_bg);
@@ -160,7 +160,7 @@ void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *ite
     vita2d_draw_line(x + w - 115, y + 52, x + w - 13, y + 52, chan_btn_border);
     vita2d_draw_line(x + w - 115, y + 24, x + w - 115, y + 52, chan_btn_border);
     vita2d_draw_line(x + w - 13, y + 24, x + w - 13, y + 52, chan_btn_border);
-    ui_draw_text(x + w - 106, y + 43, COLOR_TEXT_LIGHT, 12, "[▲] Channel");
+    ui_draw_text(x + w - 95, y + 43, COLOR_TEXT_LIGHT, 12, "Channel");
 }
 
 void ui_draw_description_modal(const VideoItem *item) {
@@ -222,7 +222,7 @@ void ui_draw_description_modal(const VideoItem *item) {
 
     // Modal footer button instructions
     vita2d_draw_line(mx + 24, my + mh - 44, mx + mw - 24, my + mh - 44, RGBA8(30, 50, 80, 255));
-    ui_draw_text(mx + 24, my + mh - 18, COLOR_TEXT_DIM, 14, "Press [● CIRCLE] to Close   |   Press [✕ CROSS] to Play Video");
+    ui_draw_text(mx + 24, my + mh - 18, COLOR_TEXT_DIM, 14, "Press CIRCLE to Close   |   Press CROSS to Play Video");
 }
 
 void ui_draw_channel_modal(const VideoItem *item) {
@@ -265,7 +265,7 @@ void ui_draw_channel_modal(const VideoItem *item) {
     ui_draw_text(mx + 40, my + 252, COLOR_HIGHLIGHT_AMBER, 13, "Powered by remote Invidious channel endpoints.");
 
     vita2d_draw_line(mx + 24, my + mh - 44, mx + mw - 24, my + mh - 44, RGBA8(30, 50, 80, 255));
-    ui_draw_text(mx + 24, my + mh - 18, COLOR_TEXT_DIM, 14, "Press [● CIRCLE] to Close   |   Press [✕ CROSS] to Browse Channel");
+    ui_draw_text(mx + 24, my + mh - 18, COLOR_TEXT_DIM, 14, "Press CIRCLE to Close   |   Press CROSS to Browse Channel");
 }
 
 void ui_draw_corner_tab(float peel_progress) {

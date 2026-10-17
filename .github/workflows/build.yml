@@ -1,0 +1,45 @@
+name: Build PocketVideo VPK
+
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build PS Vita VPK
+    runs-on: ubuntu-latest
+    container:
+      image: vitasdk/vitasdk:latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Install VitaSDK Dependencies
+        run: |
+          echo "Installing VitaSDK dependencies..."
+          vdpm libvita2d freetype libpng libjpeg-turbo zlib curl mbedtls cjson || \
+          vdpm install libvita2d freetype libpng libjpeg-turbo zlib curl mbedtls cjson || true
+
+      - name: Compile PocketVideo VPK
+        run: |
+          make clean
+          make
+
+      - name: Check VPK Output
+        run: |
+          ls -lh PocketVideo.vpk
+
+      - name: Upload Vita VPK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: PocketVideo-vpk
+          path: PocketVideo.vpk
+          if-no-files-found: error

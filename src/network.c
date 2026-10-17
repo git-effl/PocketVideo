@@ -62,7 +62,7 @@ int net_init(void) {
     }
 
     int state = 0;
-    sceNetCtlGetState(&state);
+    sceNetCtlInetGetState(&state);
     printf("[Network] NetCtl State: %d (Connected: %s)\n", 
            state, (state == SCE_NETCTL_STATE_CONNECTED) ? "YES" : "NO");
 #endif
