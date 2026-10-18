@@ -10,8 +10,8 @@ LIBS = -lvita2d -lfreetype -lbz2 -lpng -ljpeg -lz -lcurl -lssl -lcrypto -lzstd -
 
 PREFIX  = arm-vita-eabi
 CC      = $(PREFIX)-gcc
-CFLAGS  = -Wall -O2 -Iinclude -I$(VITASDK)/arm-vita-eabi/include
-LDFLAGS = -Wl,-q -Wl,--defsym=__sce_headroom=0x10000
+CFLAGS  = -Wall -O0 -Iinclude -I$(VITASDK)/arm-vita-eabi/include
+LDFLAGS = -Wl,-q -Wl,--defsym=__sce_headroom=0x10000 -Wl,-z,max-page-size=4096 -Wl,--no-warn-execstack
 ASFLAGS = $(CFLAGS)
 
 all: $(TARGET).vpk
