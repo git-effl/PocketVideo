@@ -10,7 +10,8 @@ LIBS = -lvita2d -lfreetype -lbz2 -lpng -ljpeg -lz -lcurl -lssl -lcrypto -lzstd -
 
 PREFIX  = arm-vita-eabi
 CC      = $(PREFIX)-gcc
-CFLAGS  = -Wl,-q -Wall -O3 -Iinclude -I$(VITASDK)/arm-vita-eabi/include
+CFLAGS  = -Wall -O3 -Iinclude -I$(VITASDK)/arm-vita-eabi/include
+LDFLAGS = -Wl,-q -Wl,--defsym=__sce_headroom=0x10000
 ASFLAGS = $(CFLAGS)
 
 all: $(TARGET).vpk
@@ -36,7 +37,7 @@ eboot.bin: $(TARGET).velf
 	vita-elf-create $< $@
 
 $(TARGET).elf: $(OBJS)
-	$(CC) $(CFLAGS) $^ $(LIBS) -o $@
+	$(CC) $(CFLAGS) $(LDFLAGS) $^ $(LIBS) -o $@
 
 clean:
 	@rm -rf $(TARGET).vpk $(TARGET).velf $(TARGET).elf $(OBJS) param.sfo eboot.bin
