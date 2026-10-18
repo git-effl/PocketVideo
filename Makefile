@@ -11,8 +11,7 @@ LIBS = -lvita2d -lfreetype -lbz2 -lpng -ljpeg -lz -lcurl -lssl -lcrypto -lzstd -
 PREFIX  = arm-vita-eabi
 CC      = $(PREFIX)-gcc
 CFLAGS  = -Wall -O3 -Iinclude -I$(VITASDK)/arm-vita-eabi/include
-# AGGIORNATO: Aggiunti i flag per correggere la sovrapposizione dei segmenti su GCC 15
-LDFLAGS = -Wl,-q -Wl,--defsym=__sce_headroom=0x10000 -Wl,-z,max-page-size=4096 -Wl,--no-warn-execstack
+LDFLAGS = -Wl,-q -Wl,--defsym=__sce_headroom=0x10000
 ASFLAGS = $(CFLAGS)
 
 all: $(TARGET).vpk
