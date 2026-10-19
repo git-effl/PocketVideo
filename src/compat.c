@@ -40,6 +40,8 @@ extern unsigned int OPENSSL_armcap_P;
  */
 __attribute__((constructor)) static void init_openssl_armcap_env(void) {
     setenv("OPENSSL_armcap", "0", 1);
+    setenv("OPENSSL_CONF", "app0:assets/openssl.cnf", 1);
+    setenv("SSL_CERT_FILE", "app0:assets/cacert.pem", 1);
     OPENSSL_armcap_P = 0;
 }
 
@@ -85,8 +87,10 @@ const void *UI_OpenSSL(void) {
 /* Legacy Initialization functions */
 int SSL_library_init(void) {
     setenv("OPENSSL_armcap", "0", 1);
+    setenv("OPENSSL_CONF", "app0:assets/openssl.cnf", 1);
+    setenv("SSL_CERT_FILE", "app0:assets/cacert.pem", 1);
     OPENSSL_armcap_P = 0;
-    OPENSSL_init_ssl(0x00000080ULL, (void *)0); /* OPENSSL_INIT_NO_LOAD_CONFIG */
+    OPENSSL_init_ssl(0, (void *)0);
     return 1;
 }
 

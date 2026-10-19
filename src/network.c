@@ -41,6 +41,8 @@ extern unsigned int OPENSSL_armcap_P;
 
 int net_init(void) {
     setenv("OPENSSL_armcap", "0", 1);
+    setenv("OPENSSL_CONF", "app0:assets/openssl.cnf", 1);
+    setenv("SSL_CERT_FILE", "app0:assets/cacert.pem", 1);
     OPENSSL_armcap_P = 0;
 
 #ifdef __vita__
@@ -118,15 +120,23 @@ int http_get(const char *url, HttpResponse *out_response) {
     curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, 12L);
     curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, 6L);
 
-    FILE *ca_test = fopen("ux0:data/pocketvideo/cacert.pem", "r");
+    FILE *ca_test = fopen("app0:assets/cacert.pem", "r");
     if (ca_test) {
         fclose(ca_test);
-        curl_easy_setopt(curl_handle, CURLOPT_CAINFO, "ux0:data/pocketvideo/cacert.pem");
+        curl_easy_setopt(curl_handle, CURLOPT_CAINFO, "app0:assets/cacert.pem");
         curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
         curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYHOST, 2L);
     } else {
-        curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 0L);
-        curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYHOST, 0L);
+        ca_test = fopen("ux0:data/pocketvideo/cacert.pem", "r");
+        if (ca_test) {
+            fclose(ca_test);
+            curl_easy_setopt(curl_handle, CURLOPT_CAINFO, "ux0:data/pocketvideo/cacert.pem");
+            curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
+            curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYHOST, 2L);
+        } else {
+            curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 0L);
+            curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYHOST, 0L);
+        }
     }
 
     struct curl_slist *headers = NULL;

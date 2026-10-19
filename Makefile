@@ -28,7 +28,9 @@ all: $(TARGET).vpk
 		--add assets/textures/bubble_glass.png=assets/textures/bubble_glass.png \
 		--add assets/sounds/bubble_pop.wav=assets/sounds/bubble_pop.wav \
 		--add assets/sounds/peel.wav=assets/sounds/peel.wav \
+		--add assets/openssl.cnf=assets/openssl.cnf \
 		--add assets/openssl.cnf=usr/local/vitasdk/arm-vita-eabi/ssl/openssl.cnf \
+		--add assets/cacert.pem=assets/cacert.pem \
 		$@
 
 eboot.bin: $(TARGET).velf
