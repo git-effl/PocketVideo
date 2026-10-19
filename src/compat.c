@@ -6,9 +6,12 @@
  * In OpenSSL 1.1.1, these map directly to the corresponding OPENSSL_*
  * and EVP_MD_CTX_new/free functions or are handled automatically.
  *
- * In addition, overrides OPENSSL_cpuid_setup to prevent runtime SIGILL probing
- * on Vita3K/Dynarmic CPU recompiler.
+ * In addition, sets OPENSSL_armcap=1 via a constructor to inform OpenSSL's
+ * CPUID setup to use ARM NEON directly and avoid runtime SIGILL probe instructions
+ * that trigger unimplemented instruction loops on Vita3K.
  */
+
+#include <stdlib.h>
 
 typedef void OPENSSL_STACK;
 typedef void (*OPENSSL_sk_freefunc)(void *);
@@ -28,15 +31,13 @@ extern int OPENSSL_init_ssl(unsigned long long opts, const void *settings);
 extern int OPENSSL_init_crypto(unsigned long long opts, const void *settings);
 
 /*
- * CPU capability flags for ARM Cortex-A9:
- * Setting ARMV7_NEON bit (1) and overriding OPENSSL_cpuid_setup prevents
- * OpenSSL from running signal-based instruction probing that fails on Vita3K/Dynarmic.
+ * Vita3K / ARM Cortex-A9 CPU capability override:
+ * OpenSSL's OPENSSL_cpuid_setup checks getenv("OPENSSL_armcap"). If set,
+ * it immediately assigns OPENSSL_armcap_P and returns without executing
+ * the signal-based probe instructions that fail on Vita3K's Dynarmic JIT.
  */
-#define ARMV7_NEON (1 << 0)
-unsigned int OPENSSL_armcap_P = ARMV7_NEON;
-
-void OPENSSL_cpuid_setup(void) {
-    OPENSSL_armcap_P = ARMV7_NEON;
+__attribute__((constructor(101))) static void init_openssl_armcap_env(void) {
+    setenv("OPENSSL_armcap", "1", 1);
 }
 
 /* Stack functions */
@@ -80,7 +81,7 @@ const void *UI_OpenSSL(void) {
 
 /* Legacy Initialization functions */
 int SSL_library_init(void) {
-    OPENSSL_armcap_P = ARMV7_NEON;
+    setenv("OPENSSL_armcap", "1", 0);
     OPENSSL_init_ssl(0x00000080ULL, (void *)0); /* OPENSSL_INIT_NO_LOAD_CONFIG */
     return 1;
 }
