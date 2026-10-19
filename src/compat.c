@@ -5,6 +5,9 @@
  * (EVP_MD_CTX_create, SSLeay, SSLv23_client_method, sk_*, SSL_library_init, etc.).
  * In OpenSSL 1.1.1, these map directly to the corresponding OPENSSL_*
  * and EVP_MD_CTX_new/free functions or are handled automatically.
+ *
+ * In addition, overrides OPENSSL_cpuid_setup to prevent runtime SIGILL probing
+ * on Vita3K/Dynarmic CPU recompiler.
  */
 
 typedef void OPENSSL_STACK;
@@ -23,6 +26,18 @@ extern const void *UI_null(void);
 
 extern int OPENSSL_init_ssl(unsigned long long opts, const void *settings);
 extern int OPENSSL_init_crypto(unsigned long long opts, const void *settings);
+
+/*
+ * CPU capability flags for ARM Cortex-A9:
+ * Setting ARMV7_NEON bit (1) and overriding OPENSSL_cpuid_setup prevents
+ * OpenSSL from running signal-based instruction probing that fails on Vita3K/Dynarmic.
+ */
+#define ARMV7_NEON (1 << 0)
+unsigned int OPENSSL_armcap_P = ARMV7_NEON;
+
+void OPENSSL_cpuid_setup(void) {
+    OPENSSL_armcap_P = ARMV7_NEON;
+}
 
 /* Stack functions */
 int sk_num(const void *st) {
@@ -65,16 +80,17 @@ const void *UI_OpenSSL(void) {
 
 /* Legacy Initialization functions */
 int SSL_library_init(void) {
-    OPENSSL_init_ssl(0, (void *)0);
+    OPENSSL_armcap_P = ARMV7_NEON;
+    OPENSSL_init_ssl(0x00000080ULL, (void *)0); /* OPENSSL_INIT_NO_LOAD_CONFIG */
     return 1;
 }
 
 void SSL_load_error_strings(void) {
-    OPENSSL_init_ssl(0x00200000ULL | 0x00000002ULL, (void *)0);
+    OPENSSL_init_ssl(0x00200000ULL | 0x00000002ULL | 0x00000080ULL, (void *)0);
 }
 
 void OPENSSL_add_all_algorithms_noconf(void) {
-    OPENSSL_init_crypto(0x00000004ULL | 0x00000008ULL, (void *)0);
+    OPENSSL_init_crypto(0x00000004ULL | 0x00000008ULL | 0x00000080ULL, (void *)0);
 }
 
 /* Legacy Cleanup functions (no-ops in OpenSSL 1.1.0+) */

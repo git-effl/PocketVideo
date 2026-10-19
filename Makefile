@@ -10,8 +10,8 @@ LIBS = -lvita2d -lfreetype -lbz2 -lpng -ljpeg -lz -lcurl -lssl -lcrypto -lzstd -
 
 PREFIX  = arm-vita-eabi
 CC      = $(PREFIX)-gcc
-CFLAGS  = -Wall -O0 -Iinclude -I$(VITASDK)/arm-vita-eabi/include
-LDFLAGS = -Wl,-q -Wl,--defsym=__sce_headroom=0x10000 -Wl,-z,max-page-size=4096 -Wl,--no-warn-execstack
+CFLAGS  = -Wall -O3 -Iinclude -I$(VITASDK)/arm-vita-eabi/include
+LDFLAGS = -Wl,-q -Wl,--defsym=__sce_headroom=0x10000
 ASFLAGS = $(CFLAGS)
 
 all: $(TARGET).vpk
@@ -28,6 +28,7 @@ all: $(TARGET).vpk
 		--add assets/textures/bubble_glass.png=assets/textures/bubble_glass.png \
 		--add assets/sounds/bubble_pop.wav=assets/sounds/bubble_pop.wav \
 		--add assets/sounds/peel.wav=assets/sounds/peel.wav \
+		--add assets/openssl.cnf=usr/local/vitasdk/arm-vita-eabi/ssl/openssl.cnf \
 		$@
 
 eboot.bin: $(TARGET).velf

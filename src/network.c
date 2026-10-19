@@ -50,13 +50,13 @@ int net_init(void) {
     net_param.flags = 0;
 
     int ret = sceNetInit(&net_param);
-    if (ret < 0) {
+    if (ret < 0 && ret != (int)0x80410110) {
         printf("[Network] sceNetInit failed: 0x%08X\n", ret);
         return ret;
     }
 
     ret = sceNetCtlInit();
-    if (ret < 0) {
+    if (ret < 0 && ret != (int)0x80412102) {
         printf("[Network] sceNetCtlInit failed: 0x%08X\n", ret);
         return ret;
     }

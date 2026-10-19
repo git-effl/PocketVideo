@@ -36,17 +36,31 @@ int main(int argc, char *argv[]) {
     sceTouchSetSamplingState(SCE_TOUCH_PORT_FRONT, SCE_TOUCH_SAMPLING_STATE_START);
 #endif
 
-    // 1. Initialize Network Subsystem
+    // 1. Initialize 2D Graphics Engine & Load Assets (Noto Sans + Textures)
+    printf("[Main] Initializing UI & vita2d...\n");
+    ui_init();
+
+    // Render initial startup frame so Vita3K has an active swap buffer
+    vita2d_start_drawing();
+    vita2d_clear_screen();
+    ui_draw_background();
+    ui_draw_status_bar("PocketVideo - Initializing...");
+    ui_draw_text(370, 260, COLOR_TEXT_LIGHT, 24, "Connecting to Invidious...");
+    vita2d_end_drawing();
+    vita2d_wait_rendering_done();
+    vita2d_swap_buffers();
+
+    // 2. Initialize Network Subsystem
     printf("[Main] Initializing network...\n");
     int net_err = net_init();
     if (net_err != 0) {
-        snprintf(g_status_msg, sizeof(g_status_msg), "Network Init Failed (Error: 0x%08X)", net_err);
+        snprintf(g_status_msg, sizeof(g_status_msg), "Network Init (Code: 0x%08X)", net_err);
     } else {
         g_network_ready = 1;
         snprintf(g_status_msg, sizeof(g_status_msg), "Network ready. Fetching trending...");
     }
 
-    // 2. Fetch Trending Videos from https://invidious.f5.si/api/v1/trending
+    // 3. Fetch Trending Videos from https://invidious.f5.si/api/v1/trending
     if (g_network_ready) {
         printf("[Main] Contacting %s/api/v1/trending...\n", INVIDIOUS_DEFAULT_HOST);
         int count = invidious_fetch_trending(INVIDIOUS_DEFAULT_HOST, &g_trending);
@@ -67,12 +81,9 @@ int main(int argc, char *argv[]) {
             }
             printf("--------------------------------------------------\n\n");
         } else {
-            snprintf(g_status_msg, sizeof(g_status_msg), "Fetch failed (Code: %d). Check Connection.", count);
+            snprintf(g_status_msg, sizeof(g_status_msg), "Offline / Emulator mode (Code: %d)", count);
         }
     }
-
-    // 3. Initialize 2D Graphics Engine & Load Assets (Noto Sans + Textures)
-    ui_init();
 
     // 4. Main Event & Render Loop
     int running = 1;
