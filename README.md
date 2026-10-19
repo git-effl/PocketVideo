@@ -28,17 +28,18 @@ PocketVideo/
 │   ├── network.c               # Network initialization & curl requests
 │   └── ui.c                    # Bubble, bevel, & tactile rendering
 ├── assets/                     # Custom UI textures & sounds (CC0)
-│   ├── LICENSE                 # Creative Commons Zero 1.0 Universal
 │   ├── OPENSSL                 # Apache License 2.0
 │   ├── fonts/
 │   │   ├── NotoSans-Regular.ttf# Noto Sans TrueType font
 │   │   └── OFL                 # SIL Open Font License 1.1
 │   ├── textures/
 │   │   ├── bg.png              # 960x544 textured wallpaper
-│   │   └── bubble_glass.png    # Skeuomorphic gloss overlay
+│   │   ├── bubble_glass.png    # Skeuomorphic gloss overlay
+│   |   └── CC0                 # Creative Commons Zero 1.0
 │   └── sounds/
-│       ├── bubble_pop.wav      # Tactile click sound
-│       └── peel.wav            # Corner tab sound
+│   │   ├── bubble_pop.wav      # Tactile click sound
+│   │   ├── peel.wav            # Corner tab sound
+│   │   └── CC0                 # Creative Commons Zero 1.0
 └── sce_sys/                    # Application package metadata
     ├── icon0.png               # 128x128 app icon
     └── livearea/contents/
@@ -65,4 +66,9 @@ make
 PocketVideo queries `https://invidious.f5.si/api/v1/trending` by default. You can test the endpoint directly using curl:
 ```bash
 curl -s "https://invidious.f5.si/api/v1/trending" | jq .
+
+
+### LLM DISCLAMER
+
+This project was also made with LLMs (Vibecoded),Though that,a real human has created the graphics,tested builded all of this.
 ```
