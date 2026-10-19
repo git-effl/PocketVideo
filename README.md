@@ -17,7 +17,7 @@ PocketVideo/
 ├── CMakeLists.txt              # CMake build configuration
 ├── Makefile                    # Direct Makefile compilation alternative
 ├── README.md                   # Project documentation & build guide
-├── LICENSE                     # BSD 3-Clause License
+├── LICENSE                     # GPL-3.0 License
 ├── include/
 │   ├── invidious.h             # Invidious API types & endpoints
 │   ├── network.h               # libcurl network & SSL wrapper
