@@ -66,9 +66,7 @@ make
 PocketVideo queries `https://invidious.f5.si/api/v1/trending` by default. You can test the endpoint directly using curl:
 ```bash
 curl -s "https://invidious.f5.si/api/v1/trending" | jq .
-
-
-## LLM DISCLAMER
+```
+### LLM DISCLAMER
 
 This project was also made with LLMs (Vibecoded),Though that,a real human has created the graphics,tested and built all of this.
-```
