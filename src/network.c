@@ -37,7 +37,12 @@ static size_t write_memory_callback(void *contents, size_t size, size_t nmemb, v
     return realsize;
 }
 
+extern unsigned int OPENSSL_armcap_P;
+
 int net_init(void) {
+    setenv("OPENSSL_armcap", "0", 1);
+    OPENSSL_armcap_P = 0;
+
 #ifdef __vita__
     sceSysmoduleLoadModule(SCE_SYSMODULE_NET);
     sceSysmoduleLoadModule(SCE_SYSMODULE_HTTP);

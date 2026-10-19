@@ -31,7 +31,9 @@ int main(int argc, char *argv[]) {
     printf("  Target API: %s\n", INVIDIOUS_DEFAULT_HOST);
     printf("=========================================\n");
 
-    setenv("OPENSSL_armcap", "1", 1);
+    extern unsigned int OPENSSL_armcap_P;
+    setenv("OPENSSL_armcap", "0", 1);
+    OPENSSL_armcap_P = 0;
 
 #ifdef __vita__
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
