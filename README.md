@@ -29,6 +29,9 @@ PocketVideo/
 │   └── ui.c                    # Bubble, bevel, & tactile rendering
 ├── assets/                     # Custom UI textures & sounds (CC0)
 │   ├── OPENSSL                 # Apache License 2.0
+│   ├── openssl.cnf             # OpenSSL module
+│   ├── MPL                     # Mozilla Public License 2.0
+│   ├── cacert.pem              # cURL module
 │   ├── fonts/
 │   │   ├── NotoSans-Regular.ttf# Noto Sans TrueType font
 │   │   └── OFL                 # SIL Open Font License 1.1
