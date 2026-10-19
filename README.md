@@ -29,8 +29,10 @@ PocketVideo/
 │   └── ui.c                    # Bubble, bevel, & tactile rendering
 ├── assets/                     # Custom UI textures & sounds (CC0)
 │   ├── LICENSE                 # Creative Commons Zero 1.0 Universal
+│   ├── OPENSSL                 # Apache License 2.0
 │   ├── fonts/
-│   │   └── NotoSans-Regular.ttf# Noto Sans TrueType font
+│   │   ├── NotoSans-Regular.ttf# Noto Sans TrueType font
+│   │   └── OFL                 # SIL Open Font License 1.1
 │   ├── textures/
 │   │   ├── bg.png              # 960x544 textured wallpaper
 │   │   └── bubble_glass.png    # Skeuomorphic gloss overlay
