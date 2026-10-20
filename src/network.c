@@ -44,8 +44,6 @@ int net_init(void) {
 
 #ifdef __vita__
     sceSysmoduleLoadModule(SCE_SYSMODULE_NET);
-    sceSysmoduleLoadModule(SCE_SYSMODULE_HTTP);
-    sceSysmoduleLoadModule(SCE_SYSMODULE_SSL);
 
     SceNetInitParam net_param;
     memset(&net_param, 0, sizeof(net_param));
@@ -86,8 +84,6 @@ void net_term(void) {
 #ifdef __vita__
     sceNetCtlTerm();
     sceNetTerm();
-    sceSysmoduleUnloadModule(SCE_SYSMODULE_SSL);
-    sceSysmoduleUnloadModule(SCE_SYSMODULE_HTTP);
     sceSysmoduleUnloadModule(SCE_SYSMODULE_NET);
 #endif
 }

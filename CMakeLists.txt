@@ -48,8 +48,6 @@ target_link_libraries(pocketvideo
   SceCommonDialog_stub
   SceNet_stub
   SceNetCtl_stub
-  SceHttp_stub
-  SceSsl_stub
   SceSysmodule_stub
   SceAppMgr_stub
   SceAvPlayer_stub
