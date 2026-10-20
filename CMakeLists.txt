@@ -21,7 +21,6 @@ set(SOURCES
   src/invidious.c
   src/ui.c
   src/cJSON.c
-  src/compat.c
 )
 
 add_executable(pocketvideo ${SOURCES})

@@ -1,6 +1,6 @@
 TITLE_ID = PKTV00001
 TARGET   = PocketVideo
-OBJS     = src/main.o src/network.o src/invidious.o src/ui.o src/cJSON.o src/compat.o
+OBJS     = src/main.o src/network.o src/invidious.o src/ui.o src/cJSON.o
 
 LIBS = -lvita2d -lfreetype -lbz2 -lpng -ljpeg -lz -lcurl -lssl -lcrypto -lzstd -lpthread \
        -lSceLibKernel_stub -lSceDisplay_stub -lSceGxm_stub -lSceCtrl_stub \
