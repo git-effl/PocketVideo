@@ -37,13 +37,10 @@ static size_t write_memory_callback(void *contents, size_t size, size_t nmemb, v
     return realsize;
 }
 
-extern unsigned int OPENSSL_armcap_P;
-
 int net_init(void) {
     setenv("OPENSSL_armcap", "0", 1);
     setenv("OPENSSL_CONF", "app0:assets/openssl.cnf", 1);
     setenv("SSL_CERT_FILE", "app0:assets/cacert.pem", 1);
-    OPENSSL_armcap_P = 0;
 
 #ifdef __vita__
     sceSysmoduleLoadModule(SCE_SYSMODULE_NET);

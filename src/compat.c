@@ -6,9 +6,8 @@
  * In OpenSSL 1.1.1, these map directly to the corresponding OPENSSL_*
  * and EVP_MD_CTX_new/free functions or are handled automatically.
  *
- * In addition, sets OPENSSL_armcap=0 and OPENSSL_armcap_P=0 to disable ARM NEON
- * assembly extensions in OpenSSL, forcing pure portable C arithmetic.
- * This completely avoids unimplemented NEON instructions on the Vita3K CPU recompiler.
+ * Configures OPENSSL_armcap=0 to disable ARM NEON assembly in OpenSSL,
+ * and configures OPENSSL_CONF and SSL_CERT_FILE to point to app0:assets/.
  */
 
 #include <stdlib.h>
@@ -30,19 +29,15 @@ extern const void *UI_null(void);
 extern int OPENSSL_init_ssl(unsigned long long opts, const void *settings);
 extern int OPENSSL_init_crypto(unsigned long long opts, const void *settings);
 
-/* Exported OpenSSL ARM capability vector */
-extern unsigned int OPENSSL_armcap_P;
-
 /*
- * Force OpenSSL to use pure software C cryptography (OPENSSL_armcap_P = 0).
+ * Force OpenSSL to use software C cryptography and load config/certs from app0:assets/.
  * Vita3K's Dynarmic JIT lacks complete 32-bit ARM NEON instruction emulation;
- * setting armcap to 0 ensures safe, portable software crypto without crashes.
+ * setting OPENSSL_armcap=0 ensures safe, portable software crypto without crashes.
  */
-__attribute__((constructor)) static void init_openssl_armcap_env(void) {
+__attribute__((constructor)) static void init_openssl_env(void) {
     setenv("OPENSSL_armcap", "0", 1);
     setenv("OPENSSL_CONF", "app0:assets/openssl.cnf", 1);
     setenv("SSL_CERT_FILE", "app0:assets/cacert.pem", 1);
-    OPENSSL_armcap_P = 0;
 }
 
 /* Stack functions */
@@ -89,20 +84,21 @@ int SSL_library_init(void) {
     setenv("OPENSSL_armcap", "0", 1);
     setenv("OPENSSL_CONF", "app0:assets/openssl.cnf", 1);
     setenv("SSL_CERT_FILE", "app0:assets/cacert.pem", 1);
-    OPENSSL_armcap_P = 0;
     OPENSSL_init_ssl(0, (void *)0);
     return 1;
 }
 
 void SSL_load_error_strings(void) {
     setenv("OPENSSL_armcap", "0", 1);
-    OPENSSL_armcap_P = 0;
+    setenv("OPENSSL_CONF", "app0:assets/openssl.cnf", 1);
+    setenv("SSL_CERT_FILE", "app0:assets/cacert.pem", 1);
     OPENSSL_init_ssl(0x00200000ULL | 0x00000002ULL | 0x00000080ULL, (void *)0);
 }
 
 void OPENSSL_add_all_algorithms_noconf(void) {
     setenv("OPENSSL_armcap", "0", 1);
-    OPENSSL_armcap_P = 0;
+    setenv("OPENSSL_CONF", "app0:assets/openssl.cnf", 1);
+    setenv("SSL_CERT_FILE", "app0:assets/cacert.pem", 1);
     OPENSSL_init_crypto(0x00000004ULL | 0x00000008ULL | 0x00000080ULL, (void *)0);
 }
 
