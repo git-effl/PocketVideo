@@ -10,8 +10,8 @@
 #include <psp2/sysmodule.h>
 #include <psp2/kernel/processmgr.h>
 
-#define NET_PARAM_MEM_SIZE (1 * 1024 * 1024)
-static char net_memory[NET_PARAM_MEM_SIZE];
+#define NET_PARAM_MEM_SIZE (4 * 1024 * 1024)
+static char net_memory[NET_PARAM_MEM_SIZE] __attribute__((aligned(256)));
 #endif
 
 typedef struct {
@@ -112,6 +112,7 @@ int http_get(const char *url, HttpResponse *out_response) {
     curl_easy_setopt(curl_handle, CURLOPT_FOLLOWLOCATION, 1L);
     curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, 12L);
     curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, 6L);
+    curl_easy_setopt(curl_handle, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
 
     FILE *ca_test = fopen("app0:assets/cacert.pem", "r");
     if (ca_test) {

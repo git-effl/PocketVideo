@@ -1,6 +1,6 @@
 TITLE_ID = PKTV00001
 TARGET   = PocketVideo
-OBJS     = src/main.o src/network.o src/invidious.o src/ui.o src/cJSON.o
+OBJS     = src/main.o src/network.o src/invidious.o src/ui.o src/cJSON.o src/compat.o
 
 LIBS = -lvita2d -lfreetype -lbz2 -lpng -ljpeg -lz -lcurl -lssl -lcrypto -lzstd -lpthread \
        -lSceLibKernel_stub -lSceDisplay_stub -lSceGxm_stub -lSceCtrl_stub \
@@ -10,7 +10,7 @@ LIBS = -lvita2d -lfreetype -lbz2 -lpng -ljpeg -lz -lcurl -lssl -lcrypto -lzstd -
 
 PREFIX  = arm-vita-eabi
 CC      = $(PREFIX)-gcc
-CFLAGS  = -Wall -O3 -Iinclude -I$(VITASDK)/arm-vita-eabi/include
+CFLAGS  = -Wall -O2 -Iinclude -I$(VITASDK)/arm-vita-eabi/include
 LDFLAGS = -Wl,-q -Wl,--defsym=__sce_headroom=0x10000
 ASFLAGS = $(CFLAGS)
 
