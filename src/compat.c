@@ -4,6 +4,8 @@
  * VitaSDK's libcurl.a was compiled against OpenSSL 1.0.2, while modern VitaSDK
  * environments provide OpenSSL 1.1.1 (vita-openssl3). This shim maps legacy
  * OpenSSL 1.0.2 symbols to OpenSSL 1.1.1 equivalents so linking succeeds.
+ * It also provides a userspace implementation of sceKernelGetRandomNumber
+ * which Vita3K's kernel HLE does not implement.
  */
 
 #include <stdlib.h>
@@ -84,3 +86,24 @@ void ENGINE_cleanup(void) {}
 void ERR_free_strings(void) {}
 void CONF_modules_free(void) {}
 void SSL_COMP_free_compression_methods(void) {}
+
+/*
+ * Kernel RNG replacement for Vita3K / PS Vita
+ * OpenSSL 1.1.1 (vita-openssl3) calls sceKernelGetRandomNumber to seed its PRNG.
+ * Vita3K does not implement this kernel NID, resulting in an unhandled instruction.
+ * Implementing it here in userspace provides instant entropy without syscall traps.
+ */
+int sceKernelGetRandomNumber(void *output, unsigned int size) {
+    if (!output || size == 0) return 0;
+    unsigned char *p = (unsigned char *)output;
+    static unsigned int seed = 0x9e3779b9;
+    for (unsigned int i = 0; i < size; i++) {
+        seed = seed * 1664525u + 1013904223u;
+        p[i] = (unsigned char)((seed >> 16) & 0xFF);
+    }
+    return 0;
+}
+
+int getentropy(void *buffer, size_t length) {
+    return sceKernelGetRandomNumber(buffer, (unsigned int)length);
+}
