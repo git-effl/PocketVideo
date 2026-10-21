@@ -113,25 +113,9 @@ int http_get(const char *url, HttpResponse *out_response) {
     curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, 12L);
     curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, 6L);
     curl_easy_setopt(curl_handle, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
-
-    FILE *ca_test = fopen("app0:assets/cacert.pem", "r");
-    if (ca_test) {
-        fclose(ca_test);
-        curl_easy_setopt(curl_handle, CURLOPT_CAINFO, "app0:assets/cacert.pem");
-        curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
-        curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYHOST, 2L);
-    } else {
-        ca_test = fopen("ux0:data/pocketvideo/cacert.pem", "r");
-        if (ca_test) {
-            fclose(ca_test);
-            curl_easy_setopt(curl_handle, CURLOPT_CAINFO, "ux0:data/pocketvideo/cacert.pem");
-            curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 1L);
-            curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYHOST, 2L);
-        } else {
-            curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 0L);
-            curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYHOST, 0L);
-        }
-    }
+    curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYHOST, 0L);
+    curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 1L);
 
     struct curl_slist *headers = NULL;
     headers = curl_slist_append(headers, "Accept: application/json");
