@@ -39,8 +39,7 @@ static size_t write_memory_callback(void *contents, size_t size, size_t nmemb, v
 
 int net_init(void) {
     setenv("OPENSSL_armcap", "0", 1);
-    unsetenv("OPENSSL_CONF");
-    unsetenv("SSL_CERT_FILE");
+    setenv("OPENSSL_CONF", "app0:assets/openssl.cnf", 1);
 
 #ifdef __vita__
     sceSysmoduleLoadModule(SCE_SYSMODULE_NET);

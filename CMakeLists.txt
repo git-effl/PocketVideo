@@ -68,5 +68,6 @@ vita_create_vpk(PocketVideo.vpk "PKTV00001" eboot.bin
   FILE assets/textures/bubble_glass.png assets/textures/bubble_glass.png
   FILE assets/sounds/bubble_pop.wav assets/sounds/bubble_pop.wav
   FILE assets/sounds/peel.wav assets/sounds/peel.wav
+  FILE assets/openssl.cnf assets/openssl.cnf
   FILE assets/cacert.pem assets/cacert.pem
 )

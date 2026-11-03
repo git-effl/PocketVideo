@@ -32,8 +32,7 @@ int main(int argc, char *argv[]) {
     printf("=========================================\n");
 
     setenv("OPENSSL_armcap", "0", 1);
-    unsetenv("OPENSSL_CONF");
-    unsetenv("SSL_CERT_FILE");
+    setenv("OPENSSL_CONF", "app0:assets/openssl.cnf", 1);
 
 #ifdef __vita__
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
