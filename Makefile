@@ -11,7 +11,7 @@ LIBS = -lvita2d -lfreetype -lbz2 -lpng -ljpeg -lz -lcurl -lssl -lcrypto -lzstd -
 PREFIX  = arm-vita-eabi
 CC      = $(PREFIX)-gcc
 CFLAGS  = -Wall -O2 -Iinclude -I$(VITASDK)/arm-vita-eabi/include
-LDFLAGS = -Wl,-q -Wl,--defsym=__sce_headroom=0x10000
+LDFLAGS = -Wl,-q -Wl,--allow-multiple-definition -Wl,--defsym=__sce_headroom=0x10000
 ASFLAGS = $(CFLAGS)
 
 all: $(TARGET).vpk
