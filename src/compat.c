@@ -67,18 +67,41 @@ const void *UI_OpenSSL(void) {
     return UI_null();
 }
 
+#define OPENSSL_INIT_NO_LOAD_CONFIG    0x00000080ULL
+#define OPENSSL_INIT_ADD_ALL_CIPHERS   0x00000004ULL
+#define OPENSSL_INIT_ADD_ALL_DIGESTS   0x00000008ULL
+#define OPENSSL_INIT_LOAD_CRYPTO_STRINGS 0x00000002ULL
+#define OPENSSL_INIT_LOAD_SSL_STRINGS  0x00200000ULL
+
 /* Legacy Initialization functions */
 int SSL_library_init(void) {
-    return OPENSSL_init_ssl(0, NULL);
+    return OPENSSL_init_ssl(OPENSSL_INIT_NO_LOAD_CONFIG | OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS, NULL);
 }
 
 void SSL_load_error_strings(void) {
-    OPENSSL_init_ssl(0x00200000L | 0x00000002L, NULL);
+    OPENSSL_init_ssl(OPENSSL_INIT_NO_LOAD_CONFIG | OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
 }
 
 void OPENSSL_add_all_algorithms_noconf(void) {
-    OPENSSL_init_crypto(0x00000004L | 0x00000008L, NULL);
+    OPENSSL_init_crypto(OPENSSL_INIT_NO_LOAD_CONFIG | OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS, NULL);
 }
+
+/* OpenSSL config file & dynamic module overrides: completely eliminate any app0:/openssl.cnf lookup */
+void OPENSSL_load_builtin_modules(void) {}
+
+int CONF_modules_load_file(const char *filename, const char *appname, unsigned long flags) {
+    return 1;
+}
+
+int CONF_modules_load(const void *cnf, const char *appname, unsigned long flags) {
+    return 1;
+}
+
+int OPENSSL_config(const char *config_name) {
+    return 1;
+}
+
+void OPENSSL_no_config(void) {}
 
 /* Legacy Cleanup functions (no-ops in OpenSSL 1.1.0+) */
 void EVP_cleanup(void) {}
@@ -86,6 +109,25 @@ void ENGINE_cleanup(void) {}
 void ERR_free_strings(void) {}
 void CONF_modules_free(void) {}
 void SSL_COMP_free_compression_methods(void) {}
+
+/*
+ * Safe cycle & bus timer stubs:
+ * OpenSSL default ARM implementations execute CP15 co-processor instructions
+ * (mrc p15, 0, %0, c9, c13, 0) which Vita3K Dynarmic JIT emulator does not support.
+ */
+uint32_t OPENSSL_rdtsc(void) {
+    static uint32_t counter = 0x12345678;
+    counter = counter * 1103515245u + 12345u;
+    return counter;
+}
+
+size_t OPENSSL_instrument_bus(int *out, size_t cnt) {
+    return 0;
+}
+
+size_t OPENSSL_instrument_bus2(int *out, size_t cnt, size_t max) {
+    return 0;
+}
 
 /*
  * Kernel RNG replacement for Vita3K / PS Vita

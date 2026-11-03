@@ -8,7 +8,7 @@ extern "C" {
 #endif
 
 #define MAX_VIDEOS 50
-#define INVIDIOUS_DEFAULT_HOST "https://invidious.f5.si"
+#define INVIDIOUS_DEFAULT_HOST "https://yt.chocolatemoo53.com"
 
 typedef struct {
     char id[32];

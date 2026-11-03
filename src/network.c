@@ -39,8 +39,8 @@ static size_t write_memory_callback(void *contents, size_t size, size_t nmemb, v
 
 int net_init(void) {
     setenv("OPENSSL_armcap", "0", 1);
-    setenv("OPENSSL_CONF", "app0:assets/openssl.cnf", 1);
-    setenv("SSL_CERT_FILE", "app0:assets/cacert.pem", 1);
+    unsetenv("OPENSSL_CONF");
+    unsetenv("SSL_CERT_FILE");
 
 #ifdef __vita__
     sceSysmoduleLoadModule(SCE_SYSMODULE_NET);
@@ -115,6 +115,9 @@ int http_get(const char *url, HttpResponse *out_response) {
     curl_easy_setopt(curl_handle, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
     curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 0L);
     curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYHOST, 0L);
+    curl_easy_setopt(curl_handle, CURLOPT_CAINFO, NULL);
+    curl_easy_setopt(curl_handle, CURLOPT_CAPATH, NULL);
+    curl_easy_setopt(curl_handle, CURLOPT_SSL_CIPHER_LIST, "DEFAULT:!aNULL:!eNULL:!MD5");
     curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 1L);
 
     struct curl_slist *headers = NULL;

@@ -1,6 +1,6 @@
 # PocketVideo
 
-A dedicated video client front-end that streams videos directly from public Invidious API instances (defaulting to `https://invidious.f5.si`). Designed with a classic 2010s tactile console user interface featuring glossy bubbles, corner tabs, and textured layouts.
+A dedicated video client front-end that streams videos directly from public Invidious API instances (defaulting to `https://yt.chocolatemoo53.com`). Designed with a classic 2010s tactile console user interface featuring glossy bubbles, corner tabs, and textured layouts.
 
 ## Recommended Tech Stack
 - **Toolchain**: C99 Cross-Compiler (`arm-vita-eabi-gcc` or standard embedded GCC toolchain)
@@ -29,9 +29,6 @@ PocketVideo/
 │   └── ui.c                    # Bubble, bevel, & tactile rendering
 ├── assets/                     # Custom UI textures & sounds (CC0)
 │   ├── OPENSSL                 # Apache License 2.0
-│   ├── openssl.cnf             # OpenSSL module
-│   ├── MPL                     # Mozilla Public License 2.0
-│   ├── cacert.pem              # cURL module
 │   ├── fonts/
 │   │   ├── NotoSans-Regular.ttf# Noto Sans TrueType font
 │   │   └── OFL                 # SIL Open Font License 1.1
@@ -66,9 +63,9 @@ make
 ```
 
 ### Testing with Invidious Endpoint
-PocketVideo queries `https://invidious.f5.si/api/v1/trending` by default. You can test the endpoint directly using curl:
+PocketVideo queries `https://yt.chocolatemoo53.com/api/v1/trending` by default. You can test the endpoint directly using curl:
 ```bash
-curl -s "https://invidious.f5.si/api/v1/trending" | jq .
+curl -s "https://yt.chocolatemoo53.com/api/v1/trending" | jq .
 ```
 ## LLM DISCLAMER
 

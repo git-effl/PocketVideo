@@ -1,6 +1,6 @@
 /**
  * PocketVideo - Invidious Video Client
- * Target API: https://invidious.f5.si/api/v1/trending
+ * Target API: https://yt.chocolatemoo53.com/api/v1/trending
  */
 
 #include <stdio.h>
@@ -32,8 +32,8 @@ int main(int argc, char *argv[]) {
     printf("=========================================\n");
 
     setenv("OPENSSL_armcap", "0", 1);
-    setenv("OPENSSL_CONF", "app0:assets/openssl.cnf", 1);
-    setenv("SSL_CERT_FILE", "app0:assets/cacert.pem", 1);
+    unsetenv("OPENSSL_CONF");
+    unsetenv("SSL_CERT_FILE");
 
 #ifdef __vita__
     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
         snprintf(g_status_msg, sizeof(g_status_msg), "Network ready. Fetching trending...");
     }
 
-    // 3. Fetch Trending Videos from https://invidious.f5.si/api/v1/trending
+    // 3. Fetch Trending Videos from https://yt.chocolatemoo53.com/api/v1/trending
     if (g_network_ready) {
         printf("[Main] Contacting %s/api/v1/trending...\n", INVIDIOUS_DEFAULT_HOST);
         int count = invidious_fetch_trending(INVIDIOUS_DEFAULT_HOST, &g_trending);

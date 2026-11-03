@@ -30,7 +30,7 @@ void net_term(void);
  * Perform an HTTP GET request to the given URL using libcurl.
  * Handles timeouts, SSL verification / CA bundle fallback, and dynamic buffer allocation.
  *
- * @param url Full target URL (e.g. "https://invidious.f5.si/api/v1/trending")
+ * @param url Full target URL (e.g. "https://yt.chocolatemoo53.com/api/v1/trending")
  * @param out_response Pointer to HttpResponse structure to populate
  * @return 0 on HTTP 200 success, non-zero on network or HTTP error.
  */

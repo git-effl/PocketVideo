@@ -66,7 +66,7 @@ void ui_draw_status_bar(const char *title) {
     vita2d_draw_rectangle(0, 0, SCREEN_WIDTH, 32, RGBA8(8, 14, 24, 235));
     vita2d_draw_line(0, 32, SCREEN_WIDTH, 32, RGBA8(35, 55, 90, 255));
 
-    ui_draw_text(16, 22, COLOR_BRAND_CYAN, 16, "PocketVideo (invidious.f5.si)");
+    ui_draw_text(16, 22, COLOR_BRAND_CYAN, 16, "PocketVideo (yt.chocolatemoo53.com)");
 
     if (title) {
         ui_draw_text(380, 22, COLOR_TEXT_LIGHT, 17, title);
