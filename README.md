@@ -69,5 +69,5 @@ curl -s "https://yt.chocolatemoo53.com/api/v1/trending" | jq .
 ```
 ## LLM DISCLAMER
 
-This project was also made with LLMs (Vibecoded),Though that,a real human has created the graphics,tested and built all of this.
+This project was also made with LLMs,Though that,a real human has created the graphics,tested and built all of this.
 It's all bcuz im not good at coding :\
