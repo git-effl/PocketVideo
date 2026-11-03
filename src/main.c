@@ -226,8 +226,8 @@ int main(int argc, char *argv[]) {
         ui_draw_status_bar("PocketVideo");
 
         if (g_current_view == VIEW_HOME_BUBBLES) {
-            ui_draw_text(370, 100, COLOR_TEXT_LIGHT, 24, "POCKETVIDEO");
-            ui_draw_text(260, 130, COLOR_TEXT_DIM, 15, "Select a category using D-Pad or Touch screen");
+            ui_draw_text(370, 100, COLOR_TEXT_LIGHT, 24, "Welcome to PocketVideo.");
+            ui_draw_text(260, 130, COLOR_TEXT_DIM, 15, "Select a category using D-Pad or Touch screen.");
 
             ui_draw_bubble(280.0f, 280.0f, 54.0f, "Trending", COLOR_BRAND_BLUE, 0, (g_bubble_selected == 0));
             ui_draw_bubble(480.0f, 280.0f, 54.0f, "Search", COLOR_BRAND_CYAN, 0, (g_bubble_selected == 1));
