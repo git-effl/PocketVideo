@@ -48,7 +48,7 @@ int main(int argc, char *argv[]) {
     vita2d_clear_screen();
     ui_draw_background();
     ui_draw_status_bar("PocketVideo - Initializing...");
-    ui_draw_text(370, 260, COLOR_TEXT_LIGHT, 24, "Connecting to Invidious...");
+    ui_draw_text_centered(480.0f, 260, COLOR_TEXT_LIGHT, 24, "Connecting to Invidious...");
     vita2d_end_drawing();
     vita2d_wait_rendering_done();
     vita2d_swap_buffers();
@@ -236,14 +236,14 @@ int main(int argc, char *argv[]) {
         ui_draw_status_bar("PocketVideo");
 
         if (g_current_view == VIEW_HOME_BUBBLES) {
-            ui_draw_text(370, 100, COLOR_TEXT_LIGHT, 24, "Welcome to PocketVideo.");
-            ui_draw_text(310, 130, COLOR_TEXT_DIM, 15, "Select a category using D-Pad or Touch screen.");
+            ui_draw_text_centered(480.0f, 100, COLOR_TEXT_LIGHT, 24, "Welcome to PocketVideo.");
+            ui_draw_text_centered(480.0f, 132, COLOR_TEXT_DIM, 15, "Select category using D-Pad, analog stick or touch screen.");
 
             ui_draw_bubble(280.0f, 280.0f, 54.0f, "Trending", COLOR_BRAND_BLUE, 0, (g_bubble_selected == 0));
             ui_draw_bubble(480.0f, 280.0f, 54.0f, "Search", COLOR_BRAND_CYAN, 0, (g_bubble_selected == 1));
             ui_draw_bubble(680.0f, 280.0f, 54.0f, "Instance", RGBA8(180, 80, 220, 255), 0, (g_bubble_selected == 2));
 
-            ui_draw_text(340, 480, COLOR_HIGHLIGHT_AMBER, 16, "Press CROSS to enter Trending feed");
+            ui_draw_text_centered(480.0f, 480, COLOR_HIGHLIGHT_AMBER, 16, "Press CROSS to enter Trending feed");
         } else {
             // Render Trending list
             if (g_trending.count > 0) {

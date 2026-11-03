@@ -62,6 +62,23 @@ void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const
     }
 }
 
+int ui_get_text_width(unsigned int size, const char *text) {
+    if (!text || text[0] == '\0') return 0;
+    if (g_font_noto) {
+        return vita2d_font_text_width(g_font_noto, size, text);
+    } else if (g_font_pvf_fallback) {
+        float pvf_scale = (float)size / 20.0f;
+        return vita2d_pvf_text_width(g_font_pvf_fallback, pvf_scale, text);
+    }
+    return (int)(strlen(text) * (size * 0.52f));
+}
+
+void ui_draw_text_centered(float center_x, float y, unsigned int color, unsigned int size, const char *text) {
+    if (!text) return;
+    int w = ui_get_text_width(size, text);
+    ui_draw_text(center_x - (w / 2.0f), y, color, size, text);
+}
+
 void ui_draw_status_bar(const char *title) {
     vita2d_draw_rectangle(0, 0, SCREEN_WIDTH, 32, RGBA8(8, 14, 24, 235));
     vita2d_draw_line(0, 32, SCREEN_WIDTH, 32, RGBA8(35, 55, 90, 255));

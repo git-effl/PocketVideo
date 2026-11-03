@@ -67,6 +67,8 @@ void ui_draw_background(void);
  * otherwise falls back to system font.
  */
 void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const char *text);
+int ui_get_text_width(unsigned int size, const char *text);
+void ui_draw_text_centered(float center_x, float y, unsigned int color, unsigned int size, const char *text);
 
 /**
  * Render the top status bar (Clock, battery status, Wi-Fi indicator).
