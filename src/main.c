@@ -105,23 +105,33 @@ int main(int argc, char *argv[]) {
             break;
         }
 
-        // 1. Physical Controller Buttons
+        // 1. Physical Controller Buttons & Analog Sticks
+        int stick_left  = (pad.lx < 60) || (pad.rx < 60);
+        int stick_right = (pad.lx > 195) || (pad.rx > 195);
+        int stick_up    = (pad.ly < 60) || (pad.ry < 60);
+        int stick_down  = (pad.ly > 195) || (pad.ry > 195);
+
+        int nav_left  = (pad.buttons & SCE_CTRL_LEFT)  || stick_left;
+        int nav_right = (pad.buttons & SCE_CTRL_RIGHT) || stick_right;
+        int nav_up    = (pad.buttons & SCE_CTRL_UP)    || stick_up;
+        int nav_down  = (pad.buttons & SCE_CTRL_DOWN)  || stick_down;
+
         if (g_current_view == VIEW_HOME_BUBBLES) {
-            if (pad.buttons & SCE_CTRL_RIGHT) {
-                if (g_bubble_selected < 2) { g_bubble_selected++; sceKernelDelayThread(150000); }
-            } else if (pad.buttons & SCE_CTRL_LEFT) {
-                if (g_bubble_selected > 0) { g_bubble_selected--; sceKernelDelayThread(150000); }
+            if (nav_right) {
+                if (g_bubble_selected < 2) { g_bubble_selected++; sceKernelDelayThread(160000); }
+            } else if (nav_left) {
+                if (g_bubble_selected > 0) { g_bubble_selected--; sceKernelDelayThread(160000); }
             } else if (pad.buttons & SCE_CTRL_CROSS) {
                 if (g_bubble_selected == 0) g_current_view = VIEW_TRENDING_LIST;
                 sceKernelDelayThread(200000);
             }
         } else if (g_current_view == VIEW_TRENDING_LIST) {
-            if (pad.buttons & SCE_CTRL_DOWN) {
+            if (nav_down) {
                 if (g_selected_index < g_trending.count - 1) {
                     g_selected_index++;
                     sceKernelDelayThread(150000);
                 }
-            } else if (pad.buttons & SCE_CTRL_UP) {
+            } else if (nav_up) {
                 if (g_selected_index > 0) {
                     g_selected_index--;
                     sceKernelDelayThread(150000);
@@ -227,7 +237,7 @@ int main(int argc, char *argv[]) {
 
         if (g_current_view == VIEW_HOME_BUBBLES) {
             ui_draw_text(370, 100, COLOR_TEXT_LIGHT, 24, "Welcome to PocketVideo.");
-            ui_draw_text(260, 130, COLOR_TEXT_DIM, 15, "Select a category using D-Pad or Touch screen.");
+            ui_draw_text(310, 130, COLOR_TEXT_DIM, 15, "Select a category using D-Pad or Touch screen.");
 
             ui_draw_bubble(280.0f, 280.0f, 54.0f, "Trending", COLOR_BRAND_BLUE, 0, (g_bubble_selected == 0));
             ui_draw_bubble(480.0f, 280.0f, 54.0f, "Search", COLOR_BRAND_CYAN, 0, (g_bubble_selected == 1));
@@ -265,9 +275,6 @@ int main(int argc, char *argv[]) {
                 ui_draw_channel_modal(&g_trending.items[g_selected_index]);
             }
         }
-
-        // 3. Draw Corner Tab
-        ui_draw_corner_tab(0.0f);
 
         vita2d_end_drawing();
         vita2d_wait_rendering_done();

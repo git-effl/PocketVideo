@@ -89,6 +89,12 @@ void ui_draw_bubble(float cx, float cy, float radius, const char *title,
     // Drop shadow
     vita2d_draw_fill_circle(cx + 3, cy + 6, r + 2, COLOR_BUBBLE_SHADOW);
 
+    // Selected circular halo ring around bubble
+    if (is_selected) {
+        vita2d_draw_fill_circle(cx, cy, r + 7.0f, COLOR_HIGHLIGHT_AMBER);
+        vita2d_draw_fill_circle(cx, cy, r + 1.0f, RGBA8(10, 18, 36, 255));
+    }
+
     // Sphere base
     vita2d_draw_fill_circle(cx, cy, r, base_col);
 
@@ -99,10 +105,6 @@ void ui_draw_bubble(float cx, float cy, float radius, const char *title,
         vita2d_draw_texture_scale(g_tex_bubble_glass, cx - r, cy - r, scale, scale);
     } else {
         vita2d_draw_fill_circle(cx - (r * 0.22f), cy - (r * 0.25f), r * 0.42f, COLOR_GLASS_SHEEN);
-    }
-
-    if (is_selected) {
-        vita2d_draw_line(cx - r - 4, cy, cx + r + 4, cy, COLOR_HIGHLIGHT_AMBER);
     }
 
     if (title) {
@@ -269,7 +271,5 @@ void ui_draw_channel_modal(const VideoItem *item) {
 }
 
 void ui_draw_corner_tab(float peel_progress) {
-    float size = 44.0f + (peel_progress * 30.0f);
-    vita2d_draw_line(SCREEN_WIDTH - size, 0, SCREEN_WIDTH, size, RGBA8(255, 255, 255, 220));
-    ui_draw_text(SCREEN_WIDTH - 38, 22, COLOR_BRAND_CYAN, 12, "TAB");
+    (void)peel_progress;
 }
