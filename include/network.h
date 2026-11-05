@@ -14,8 +14,10 @@ typedef struct {
     char error_msg[256];
 } HttpResponse;
 
+typedef int (*HttpDownloadProgressFn)(void *userdata, double dl_now, double dl_total);
+
 /**
- * Initialize PlayStation Vita network subsystem (sceNet, sceSsl, sceHttp, curl).
+ * Initialize PlayStation Vita network subsystem (sceNet, sceNetCtl, curl).
  * Must be called before making any network requests.
  * Returns 0 on success, negative error code on failure.
  */
@@ -28,13 +30,20 @@ void net_term(void);
 
 /**
  * Perform an HTTP GET request to the given URL using libcurl.
- * Handles timeouts, SSL verification / CA bundle fallback, and dynamic buffer allocation.
  *
- * @param url Full target URL (e.g. "https://yt.chocolatemoo53.com/api/v1/trending")
+ * @param url Full target URL
  * @param out_response Pointer to HttpResponse structure to populate
  * @return 0 on HTTP 200 success, non-zero on network or HTTP error.
  */
 int http_get(const char *url, HttpResponse *out_response);
+
+/**
+ * Download an HTTP/HTTPS file directly to disk (e.g. ux0:data/...) with progress callback.
+ *
+ * @return 0 on HTTP 200/206 success, non-zero on failure or cancellation.
+ */
+int http_download_file(const char *url, const char *dest_path,
+                       HttpDownloadProgressFn progress_cb, void *userdata);
 
 /**
  * Free memory buffers associated with an HttpResponse.

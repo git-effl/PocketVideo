@@ -20,6 +20,8 @@
 #include <psp2/net/net.h>
 #include <psp2/net/netctl.h>
 #include <psp2/sysmodule.h>
+#include <psp2/io/fcntl.h>
+#include <psp2/io/stat.h>
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/clib.h>
 
@@ -43,12 +45,6 @@ static void net_log(const char *fmt, ...) {
 }
 
 #ifdef __vita__
-/*
- * Override VitaSDK newlib's _vita_net_init / _vita_net_term so that
- * sceNetInit + sceNetCtlInit are called strictly ONCE per process,
- * preventing duplicate-init errors (0x80410110 / 0x80412102) when
- * newlib socket/DNS helpers are invoked after net_init().
- */
 int _vita_net_init(void) {
     if (s_vita_net_inited) {
         return 0;
@@ -93,11 +89,6 @@ void _vita_net_term(void) {
     s_vita_net_inited = 0;
 }
 
-/*
- * Pure C RFC-compliant inet_pton (IPv4 & IPv6).
- * Avoids calling sceNetInetPton on hostnames like "yt.chocolatemoo53.com",
- * which otherwise logs SCE_NET_ERROR_EINVAL (0x80410116) on every DNS lookup.
- */
 static int pv_inet_pton4(const char *src, unsigned char *dst) {
     int saw_digit = 0;
     int octets = 0;
@@ -109,7 +100,7 @@ static int pv_inet_pton4(const char *src, unsigned char *dst) {
         if (ch >= '0' && ch <= '9') {
             unsigned int val = (unsigned int)(*tp * 10 + (ch - '0'));
             if (saw_digit && *tp == 0) {
-                return 0; /* Reject leading zero */
+                return 0;
             }
             if (val > 255) {
                 return 0;
@@ -154,12 +145,14 @@ static int pv_inet_pton6(const char *src, unsigned char *dst) {
     curtok = src;
 
     while ((ch = (unsigned char)*src++) != '\0') {
-        const char *pch = strchr(xdigits_l, ch);
+        const char *xd = xdigits_l;
+        const char *pch = strchr(xd, ch);
         if (!pch) {
-            pch = strchr(xdigits_u, ch);
+            xd = xdigits_u;
+            pch = strchr(xd, ch);
         }
         if (pch) {
-            unsigned int nib = (unsigned int)(pch - (strchr(xdigits_l, ch) ? xdigits_l : xdigits_u));
+            unsigned int nib = (unsigned int)(pch - xd);
             val <<= 4;
             val |= nib;
             if (++seen_xdigits > 4) {
@@ -234,19 +227,17 @@ int inet_pton(int af, const char *restrict src, void *restrict dst) {
     return -1;
 }
 
-/*
- * DNS lookup via sceNetResolverStartNtoa with static caching and smart
- * resolver ID handling (avoids stubbed sceNetResolverCreate/Destroy
- * warnings in Vita3K while supporting real PS Vita hardware fallback).
- */
+#define PV_DNS_CACHE_SIZE 16
+
 struct hostent *gethostbyname(const char *name) {
     static struct hostent s_he;
     static char *s_aliases[1] = {NULL};
     static char *s_addr_list[2] = {NULL, NULL};
     static struct in_addr s_addr;
     static char s_hostname[256];
-    static char s_cached_name[256];
-    static struct in_addr s_cached_addr;
+    static char s_dns_names[PV_DNS_CACHE_SIZE][256];
+    static struct in_addr s_dns_addrs[PV_DNS_CACHE_SIZE];
+    static int s_dns_next = 0;
 
     if (!name || name[0] == '\0') {
         return NULL;
@@ -260,37 +251,45 @@ struct hostent *gethostbyname(const char *name) {
 
     if (pv_inet_pton4(name, (unsigned char *)&s_addr.s_addr) == 1) {
         /* Numeric IPv4 address */
-    } else if (s_cached_name[0] != '\0' && strcmp(s_cached_name, name) == 0) {
-        s_addr = s_cached_addr;
     } else {
-        SceNetInAddr resolved;
-        memset(&resolved, 0, sizeof(resolved));
-
-        int ret = -1;
-        if (s_resolver_id >= 0) {
-            ret = sceNetResolverStartNtoa(s_resolver_id, name, &resolved, 0, 0, 0);
-        } else {
-            /* Try rid = 1 directly first (works natively in Vita3K HLE without stub warnings) */
-            ret = sceNetResolverStartNtoa(1, name, &resolved, 0, 0, 0);
-            if (ret < 0) {
-                /* Real PS Vita hardware: create persistent resolver once */
-                SceUID created = sceNetResolverCreate("pv_resolver", NULL, 0);
-                if (created >= 0) {
-                    s_resolver_id = created;
-                    s_resolver_created = 1;
-                    ret = sceNetResolverStartNtoa(s_resolver_id, name, &resolved, 0, 0, 0);
-                }
+        int found = 0;
+        for (int i = 0; i < PV_DNS_CACHE_SIZE; i++) {
+            if (s_dns_names[i][0] != '\0' && strcmp(s_dns_names[i], name) == 0) {
+                s_addr = s_dns_addrs[i];
+                found = 1;
+                break;
             }
         }
 
-        if (ret < 0) {
-            net_log("[Network] DNS resolution failed for '%s' (0x%08X)", name, ret);
-            return NULL;
-        }
+        if (!found) {
+            SceNetInAddr resolved;
+            memset(&resolved, 0, sizeof(resolved));
 
-        s_addr.s_addr = resolved.s_addr;
-        snprintf(s_cached_name, sizeof(s_cached_name), "%s", name);
-        s_cached_addr = s_addr;
+            int ret = -1;
+            if (s_resolver_id >= 0) {
+                ret = sceNetResolverStartNtoa(s_resolver_id, name, &resolved, 0, 0, 0);
+            } else {
+                ret = sceNetResolverStartNtoa(1, name, &resolved, 0, 0, 0);
+                if (ret < 0) {
+                    SceUID created = sceNetResolverCreate("pv_resolver", NULL, 0);
+                    if (created >= 0) {
+                        s_resolver_id = created;
+                        s_resolver_created = 1;
+                        ret = sceNetResolverStartNtoa(s_resolver_id, name, &resolved, 0, 0, 0);
+                    }
+                }
+            }
+
+            if (ret < 0) {
+                net_log("[Network] DNS resolution failed for '%s' (0x%08X)", name, ret);
+                return NULL;
+            }
+
+            s_addr.s_addr = resolved.s_addr;
+            snprintf(s_dns_names[s_dns_next], sizeof(s_dns_names[s_dns_next]), "%s", name);
+            s_dns_addrs[s_dns_next] = s_addr;
+            s_dns_next = (s_dns_next + 1) % PV_DNS_CACHE_SIZE;
+        }
     }
 
     snprintf(s_hostname, sizeof(s_hostname), "%s", name);
@@ -307,10 +306,6 @@ struct hostent *gethostbyname(const char *name) {
     return &s_he;
 }
 
-/*
- * POSIX socket wrappers (-Wl,--wrap=...) to prevent EWOULDBLOCK (0x80410123)
- * errors on sceNetConnect and sceNetRecv/sceNetSend in Vita3K.
- */
 #define PV_MAX_FDS 512
 static volatile unsigned char s_fd_is_socket[PV_MAX_FDS];
 static volatile unsigned char s_fd_nonblock[PV_MAX_FDS];
@@ -368,7 +363,6 @@ int __wrap_setsockopt(int sockfd, int level, int optname, const void *optval, so
             int nb = (*(const int *)optval) ? 1 : 0;
             s_fd_nonblock[sockfd] = (unsigned char)nb;
             if (!s_fd_connected[sockfd] && nb) {
-                /* Defer SCE_NET_SO_NBIO until connect() completes */
                 return 0;
             }
         }
@@ -515,6 +509,42 @@ static size_t write_memory_callback(void *contents, size_t size, size_t nmemb, v
     return realsize;
 }
 
+typedef struct {
+#ifdef __vita__
+    SceUID fd;
+#else
+    FILE *fp;
+#endif
+    HttpDownloadProgressFn progress_cb;
+    void *userdata;
+} FileDownloadCtx;
+
+static size_t write_file_callback(void *contents, size_t size, size_t nmemb, void *userp) {
+    size_t realsize = size * nmemb;
+    FileDownloadCtx *ctx = (FileDownloadCtx *)userp;
+    if (!ctx || realsize == 0) return 0;
+
+#ifdef __vita__
+    if (ctx->fd < 0) return 0;
+    int written = sceIoWrite(ctx->fd, contents, (SceSize)realsize);
+    return (written > 0) ? (size_t)written : 0;
+#else
+    if (!ctx->fp) return 0;
+    return fwrite(contents, 1, realsize, ctx->fp);
+#endif
+}
+
+static int xfer_progress_callback(void *clientp, curl_off_t dltotal, curl_off_t dlnow,
+                                  curl_off_t ultotal, curl_off_t ulnow) {
+    (void)ultotal;
+    (void)ulnow;
+    FileDownloadCtx *ctx = (FileDownloadCtx *)clientp;
+    if (ctx && ctx->progress_cb) {
+        return ctx->progress_cb(ctx->userdata, (double)dlnow, (double)dltotal);
+    }
+    return 0;
+}
+
 int net_init(void) {
     setenv("OPENSSL_armcap", "0", 1);
     setenv("OPENSSL_CONF", "app0:assets/openssl.cnf", 1);
@@ -566,10 +596,10 @@ int http_get(const char *url, HttpResponse *out_response) {
     curl_easy_setopt(curl_handle, CURLOPT_URL, url);
     curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_memory_callback);
     curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void *)&chunk);
-    curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "PocketVideo/1.0");
+    curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "Mozilla/5.0 (PlayStation Vita 3.74) PocketVideo/1.0");
     curl_easy_setopt(curl_handle, CURLOPT_FOLLOWLOCATION, 1L);
-    curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, 25L);
-    curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, 10L);
+    curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, 20L);
+    curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, 8L);
     curl_easy_setopt(curl_handle, CURLOPT_FORBID_REUSE, 1L);
     curl_easy_setopt(curl_handle, CURLOPT_FRESH_CONNECT, 1L);
     curl_easy_setopt(curl_handle, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
@@ -581,7 +611,7 @@ int http_get(const char *url, HttpResponse *out_response) {
     curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 1L);
 
     struct curl_slist *headers = NULL;
-    headers = curl_slist_append(headers, "Accept: application/json");
+    headers = curl_slist_append(headers, "Accept: application/json, image/jpeg, */*");
     headers = curl_slist_append(headers, "Accept-Encoding: identity");
     curl_easy_setopt(curl_handle, CURLOPT_HTTPHEADER, headers);
 
@@ -604,8 +634,8 @@ int http_get(const char *url, HttpResponse *out_response) {
     out_response->data = chunk.memory;
     out_response->size = chunk.size;
 
-    net_log("[Network] HTTP %ld received (%lu bytes) from %s",
-            out_response->http_status, (unsigned long)out_response->size, url);
+    net_log("[Network] HTTP %ld received (%lu bytes)",
+            out_response->http_status, (unsigned long)out_response->size);
 
     if (out_response->http_status != 200) {
         snprintf(out_response->error_msg, sizeof(out_response->error_msg),
@@ -613,6 +643,81 @@ int http_get(const char *url, HttpResponse *out_response) {
         return -3;
     }
 
+    return 0;
+}
+
+int http_download_file(const char *url, const char *dest_path,
+                       HttpDownloadProgressFn progress_cb, void *userdata) {
+    if (!url || !dest_path) return -1;
+
+    FileDownloadCtx ctx;
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.progress_cb = progress_cb;
+    ctx.userdata = userdata;
+
+#ifdef __vita__
+    sceIoMkdir("ux0:data", 0777);
+    ctx.fd = sceIoOpen(dest_path, SCE_O_WRONLY | SCE_O_CREAT | SCE_O_TRUNC, 0777);
+    if (ctx.fd < 0) {
+        net_log("[Network] Failed to open '%s' for writing (0x%08X)", dest_path, ctx.fd);
+        return -1;
+    }
+#else
+    ctx.fp = fopen(dest_path, "wb");
+    if (!ctx.fp) return -1;
+#endif
+
+    CURL *curl_handle = curl_easy_init();
+    if (!curl_handle) {
+#ifdef __vita__
+        sceIoClose(ctx.fd);
+#else
+        fclose(ctx.fp);
+#endif
+        return -1;
+    }
+
+    curl_easy_setopt(curl_handle, CURLOPT_URL, url);
+    curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_file_callback);
+    curl_easy_setopt(curl_handle, CURLOPT_WRITEDATA, (void *)&ctx);
+    curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "Mozilla/5.0 (PlayStation Vita 3.74) PocketVideo/1.0");
+    curl_easy_setopt(curl_handle, CURLOPT_FOLLOWLOCATION, 1L);
+    curl_easy_setopt(curl_handle, CURLOPT_TIMEOUT, 120L);
+    curl_easy_setopt(curl_handle, CURLOPT_CONNECTTIMEOUT, 12L);
+    curl_easy_setopt(curl_handle, CURLOPT_FORBID_REUSE, 1L);
+    curl_easy_setopt(curl_handle, CURLOPT_FRESH_CONNECT, 1L);
+    curl_easy_setopt(curl_handle, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
+    curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 0L);
+    curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYHOST, 0L);
+    curl_easy_setopt(curl_handle, CURLOPT_CAINFO, NULL);
+    curl_easy_setopt(curl_handle, CURLOPT_CAPATH, NULL);
+    curl_easy_setopt(curl_handle, CURLOPT_SSL_CIPHER_LIST, "DEFAULT:!aNULL:!eNULL:!MD5");
+
+    if (progress_cb) {
+        curl_easy_setopt(curl_handle, CURLOPT_XFERINFOFUNCTION, xfer_progress_callback);
+        curl_easy_setopt(curl_handle, CURLOPT_XFERINFODATA, (void *)&ctx);
+        curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 0L);
+    } else {
+        curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 1L);
+    }
+
+    CURLcode res = curl_easy_perform(curl_handle);
+    long status = 0;
+    curl_easy_getinfo(curl_handle, CURLINFO_RESPONSE_CODE, &status);
+    curl_easy_cleanup(curl_handle);
+
+#ifdef __vita__
+    sceIoClose(ctx.fd);
+#else
+    fclose(ctx.fp);
+#endif
+
+    if (res != CURLE_OK || status < 200 || status >= 400) {
+        net_log("[Network] File download failed (cURL=%d, HTTP=%ld)", (int)res, status);
+        return -2;
+    }
+
+    net_log("[Network] Stream saved to %s (HTTP %ld)", dest_path, status);
     return 0;
 }
 

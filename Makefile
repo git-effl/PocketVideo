@@ -4,8 +4,8 @@ OBJS     = src/main.o src/network.o src/invidious.o src/ui.o src/cJSON.o src/com
 
 LIBS = -lvita2d -lfreetype -lbz2 -lpng -ljpeg -lz -lcurl -lssl -lcrypto -lzstd -lpthread \
        -lSceLibKernel_stub -lSceDisplay_stub -lSceGxm_stub -lSceCtrl_stub \
-       -lSceTouch_stub -lScePgf_stub -lScePvf_stub -lSceCommonDialog_stub \
-       -lSceNet_stub -lSceNetCtl_stub \
+       -lSceTouch_stub -lScePgf_stub -lScePvf_stub -lSceCommonDialog_stub -lSceIme_stub \
+       -lSceNet_stub -lSceNetCtl_stub -lSceAudio_stub \
        -lSceSysmodule_stub -lSceAppMgr_stub -lSceAvPlayer_stub -lm
 
 PREFIX  = arm-vita-eabi

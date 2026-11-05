@@ -1,6 +1,7 @@
 #ifndef UI_H
 #define UI_H
 
+#include <stdint.h>
 #include <vita2d.h>
 #include <psp2/ctrl.h>
 #include <psp2/touch.h>
@@ -38,67 +39,42 @@ typedef enum {
     VIEW_MODAL_CHANNEL
 } AppView;
 
-// Global asset texture pointers
 extern vita2d_texture *g_tex_bg;
 extern vita2d_texture *g_tex_bubble_glass;
-
-// Global typography pointers
 extern vita2d_font *g_font_noto;
 extern vita2d_pvf  *g_font_pvf_fallback;
 
-/**
- * Initialize 2D graphics subsystem, load Noto Sans font,
- * and load UI textures (bg.png, bubble_glass.png) from app0:assets/.
- */
 int ui_init(void);
-
-/**
- * Free all textures, fonts, and shutdown graphics.
- */
 void ui_term(void);
 
-/**
- * Draw background wallpaper using app0:assets/textures/bg.png
- */
 void ui_draw_background(void);
-
-/**
- * Unified text drawing helper: uses Noto Sans font if available,
- * otherwise falls back to system font.
- */
 void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const char *text);
 int ui_get_text_width(unsigned int size, const char *text);
 void ui_draw_text_centered(float center_x, float y, unsigned int color, unsigned int size, const char *text);
 
-/**
- * Render the top status bar (Clock, battery status, Wi-Fi indicator).
- */
 void ui_draw_status_bar(const char *title);
-
-/**
- * Render a tactile glossy bubble with glass reflection and drop shadow.
- */
 void ui_draw_bubble(float cx, float cy, float radius, const char *title,
                     unsigned int base_col, int is_pressed, int is_selected);
 
-/**
- * Render a video card in the trending list view with action button badges.
- */
+/* Search / Direct ID bar at top of Trending tab */
+void ui_draw_search_bar(const char *query, int is_search_mode);
+
+/* Thumbnail texture cache helpers */
+vita2d_texture *ui_get_cached_thumbnail(const char *video_id);
+void ui_fetch_one_visible_thumbnail(const VideoList *list, int offset, int visible_count);
+void ui_clear_thumbnails(void);
+
+/* Video card (no Description button on card; Description moves to playback HUD) */
 void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *item, int is_focused);
 
-/**
- * Render tactile modal dialog showing multi-line video description.
- */
-void ui_draw_description_modal(const VideoItem *item);
+/* Playback view with fading HUD controls + Description button */
+void ui_draw_player_screen(const VideoItem *item, vita2d_texture *video_tex,
+                           vita2d_texture *fallback_thumb, float hud_alpha,
+                           int is_paused, uint64_t cur_ms, uint64_t total_ms,
+                           int desc_open, int desc_scroll, const char *player_status);
 
-/**
- * Render tactile modal dialog showing channel metadata & author profile.
- */
+void ui_draw_description_modal(const VideoItem *item, int scroll_line);
 void ui_draw_channel_modal(const VideoItem *item);
-
-/**
- * Render the tactile corner page tab in the top-right corner.
- */
 void ui_draw_corner_tab(float peel_progress);
 
 #ifdef __cplusplus
