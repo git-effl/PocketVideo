@@ -69,7 +69,8 @@ static void parse_video_object(cJSON *item, VideoItem *v) {
 
     cJSON *desc = cJSON_GetObjectItemCaseSensitive(item, "description");
     if (cJSON_IsString(desc) && desc->valuestring && desc->valuestring[0] != '\0') {
-        snprintf(v->description, sizeof(v->description), "%.1020s", desc->valuestring);
+        strncpy(v->description, desc->valuestring, sizeof(v->description) - 1);
+        v->description[sizeof(v->description) - 1] = '\0';
     } else {
         snprintf(v->description, sizeof(v->description), "No description provided for this video.");
     }
@@ -130,7 +131,14 @@ int invidious_fetch_trending(const char *instance, VideoList *out_list) {
 
     if (!root) {
         const char *error_ptr = cJSON_GetErrorPtr();
-        inv_log("[Invidious] JSON parsing failed! Error near: %.40s", error_ptr ? error_ptr : "unknown");
+        char err_snippet[48];
+        if (error_ptr) {
+            strncpy(err_snippet, error_ptr, sizeof(err_snippet) - 1);
+            err_snippet[sizeof(err_snippet) - 1] = '\0';
+        } else {
+            snprintf(err_snippet, sizeof(err_snippet), "unknown");
+        }
+        inv_log("[Invidious] JSON parsing failed! Error near: %s", err_snippet);
         return -5;
     }
 

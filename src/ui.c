@@ -150,13 +150,32 @@ void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *ite
     vita2d_draw_rectangle(x + thumb_w - 42, y + thumb_h - 10, 46, 16, RGBA8(0, 0, 0, 220));
     ui_draw_text(x + thumb_w - 38, y + thumb_h + 3, COLOR_TEXT_LIGHT, 12, dur);
 
-    char truncated_title[54];
-    snprintf(truncated_title, sizeof(truncated_title), "%.48s%s", item->title, strlen(item->title) > 48 ? "..." : "");
+    char truncated_title[56];
+    size_t tlen = strlen(item->title);
+    if (tlen <= 48) {
+        snprintf(truncated_title, sizeof(truncated_title), "%s", item->title);
+    } else {
+        memcpy(truncated_title, item->title, 48);
+        memcpy(truncated_title + 48, "...", 4);
+    }
     ui_draw_text(x + thumb_w + 18, y + 26, is_focused ? COLOR_BRAND_CYAN : COLOR_TEXT_LIGHT, 17, truncated_title);
 
+    char views_buf[32];
+    unsigned long long uviews = (item->view_count > 0) ? (unsigned long long)item->view_count : 0ULL;
+    char rev[32];
+    size_t rpos = 0, vpos = 0;
+    do {
+        rev[rpos++] = (char)('0' + (uviews % 10ULL));
+        uviews /= 10ULL;
+    } while (uviews > 0 && rpos < sizeof(rev));
+    while (rpos > 0 && vpos + 1 < sizeof(views_buf)) {
+        views_buf[vpos++] = rev[--rpos];
+    }
+    views_buf[vpos] = '\0';
+
     char meta_info[256];
-    snprintf(meta_info, sizeof(meta_info), "%s  *  %lld views  *  %s",
-             item->author, item->view_count, item->published_text);
+    snprintf(meta_info, sizeof(meta_info), "%s  *  %s views  *  %s",
+             item->author, views_buf, item->published_text);
     ui_draw_text(x + thumb_w + 18, y + 52, COLOR_TEXT_DIM, 14, meta_info);
 
     // Description & Channel tactile button badges
@@ -208,14 +227,33 @@ void ui_draw_description_modal(const VideoItem *item) {
     vita2d_draw_line(mx + 24, my + 46, mx + mw - 24, my + 46, RGBA8(30, 50, 80, 255));
 
     // Video Title
-    char truncated_title[70];
-    snprintf(truncated_title, sizeof(truncated_title), "%.64s%s", item->title, strlen(item->title) > 64 ? "..." : "");
+    char truncated_title[72];
+    size_t tlen = strlen(item->title);
+    if (tlen <= 64) {
+        snprintf(truncated_title, sizeof(truncated_title), "%s", item->title);
+    } else {
+        memcpy(truncated_title, item->title, 64);
+        memcpy(truncated_title + 64, "...", 4);
+    }
     ui_draw_text(mx + 24, my + 76, COLOR_TEXT_LIGHT, 17, truncated_title);
 
     // Channel & metadata
+    char views_buf[32];
+    unsigned long long uviews = (item->view_count > 0) ? (unsigned long long)item->view_count : 0ULL;
+    char rev[32];
+    size_t rpos = 0, vpos = 0;
+    do {
+        rev[rpos++] = (char)('0' + (uviews % 10ULL));
+        uviews /= 10ULL;
+    } while (uviews > 0 && rpos < sizeof(rev));
+    while (rpos > 0 && vpos + 1 < sizeof(views_buf)) {
+        views_buf[vpos++] = rev[--rpos];
+    }
+    views_buf[vpos] = '\0';
+
     char meta[256];
-    snprintf(meta, sizeof(meta), "Channel: %s   |   Views: %lld   |   Published: %s",
-             item->author, item->view_count, item->published_text);
+    snprintf(meta, sizeof(meta), "Channel: %s   |   Views: %s   |   Published: %s",
+             item->author, views_buf, item->published_text);
     ui_draw_text(mx + 24, my + 104, COLOR_HIGHLIGHT_AMBER, 14, meta);
 
     // Description text box
@@ -226,13 +264,15 @@ void ui_draw_description_modal(const VideoItem *item) {
     int line_num = 0;
     int line_max = 9;
     char line_buf[80];
-    int len = strlen(desc);
+    int len = (int)strlen(desc);
     int start = 0;
 
     while (start < len && line_num < line_max) {
         int take = 74;
         if (start + take > len) take = len - start;
-        snprintf(line_buf, sizeof(line_buf), "%.*s", take, desc + start);
+        if (take >= (int)sizeof(line_buf)) take = (int)sizeof(line_buf) - 1;
+        memcpy(line_buf, desc + start, (size_t)take);
+        line_buf[take] = '\0';
         ui_draw_text(mx + 36, my + 148 + (line_num * 22), COLOR_TEXT_LIGHT, 13, line_buf);
         start += take;
         line_num++;

@@ -502,7 +502,8 @@ static size_t write_memory_callback(void *contents, size_t size, size_t nmemb, v
 
     char *ptr = realloc(mem->memory, mem->size + realsize + 1);
     if (!ptr) {
-        net_log("[Network] ERROR: Out of memory reallocating buffer (%zu bytes)", mem->size + realsize + 1);
+        net_log("[Network] ERROR: Out of memory reallocating buffer (%lu bytes)",
+                (unsigned long)(mem->size + realsize + 1));
         return 0;
     }
 
@@ -603,7 +604,8 @@ int http_get(const char *url, HttpResponse *out_response) {
     out_response->data = chunk.memory;
     out_response->size = chunk.size;
 
-    net_log("[Network] HTTP %ld received (%zu bytes) from %s", out_response->http_status, out_response->size, url);
+    net_log("[Network] HTTP %ld received (%lu bytes) from %s",
+            out_response->http_status, (unsigned long)out_response->size, url);
 
     if (out_response->http_status != 200) {
         snprintf(out_response->error_msg, sizeof(out_response->error_msg),
