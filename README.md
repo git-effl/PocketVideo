@@ -1,7 +1,7 @@
 # PocketVideo
 
 An Invidious client for the Playstation Vita,that connects to a server to play videos on this fantastic machine.
-It can DVS (Direct Video Stream),serach by using a video id,view channel info,etc..
+It can DVS (Direct Video Stream),search by using a video id,view channel info,etc..
 
 ## How to Build
 
