@@ -5,12 +5,8 @@ It can DVS (Direct Video Stream),search by using a video id,view channel info,et
 
 ## How to Build
 
-### Using Docker
-```bash
-docker run --rm -v $(pwd):/build vitasdk/vitasdk /bin/bash -c "cd /build && mkdir -p build && cd build && cmake .. && make"
-```
+All you need is VitaSDK,CMake and you to clone this repo.
 
-### Using Local SDK
 ```bash
 mkdir build && cd build
 cmake ..
