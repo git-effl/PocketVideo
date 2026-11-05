@@ -19,9 +19,9 @@ ASFLAGS = $(CFLAGS)
 
 all: $(TARGET).vpk
 
-# 1. Define param.sfo generation first so it runs before packaging
+# 1. Added the missing -s flag before APP_VER
 param.sfo:
-	vita-mksfoex -s TITLE_ID=$(TITLE_ID) APP_VER="01.00" "PocketVideo" $@
+	vita-mksfoex -s TITLE_ID=$(TITLE_ID) -s APP_VER="01.00" "PocketVideo" $@
 
 # 2. VPK depends on param.sfo and eboot.bin being fully ready
 %.vpk: eboot.bin param.sfo
