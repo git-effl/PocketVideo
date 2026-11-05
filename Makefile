@@ -19,8 +19,7 @@ ASFLAGS = $(CFLAGS)
 
 all: $(TARGET).vpk
 
-%.vpk: eboot.bin
-	vita-mksfoex -s TITLE_ID=$(TITLE_ID) APP_VER="01.00" "PocketVideo" param.sfo
+%.vpk: eboot.bin param.sfo
 	vita-pack-vpk -s param.sfo -b eboot.bin \
 		--add sce_sys/icon0.png=sce_sys/icon0.png \
 		--add sce_sys/livearea/contents/bg.png=sce_sys/livearea/contents/bg.png \
@@ -34,6 +33,9 @@ all: $(TARGET).vpk
 		--add assets/openssl.cnf=assets/openssl.cnf \
 		--add assets/cacert.pem=assets/cacert.pem \
 		$@
+
+param.sfo:
+	vita-mksfoex -s TITLE_ID=$(TITLE_ID) APP_VER="01.00" "PocketVideo" $@
 
 eboot.bin: $(TARGET).velf
 	vita-make-fself -c $< $@
