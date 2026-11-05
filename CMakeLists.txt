@@ -8,7 +8,7 @@ set(CMAKE_TOOLCHAIN_FILE "$ENV{VITASDK}/share/vita.toolchain.cmake" CACHE PATH "
 project(PocketVideo C)
 
 set(CMAKE_C_STANDARD 99)
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -Wall -Wno-unused-variable -Wl,--allow-multiple-definition -Wl,--defsym=__sce_headroom=0x10000")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -Wall -Wno-unused-variable -Wl,--allow-multiple-definition -Wl,--defsym=__sce_headroom=0x10000 -Wl,--wrap=socket -Wl,--wrap=_close_r -Wl,--wrap=setsockopt -Wl,--wrap=_fcntl_r -Wl,--wrap=connect -Wl,--wrap=recv -Wl,--wrap=_read_r -Wl,--wrap=send -Wl,--wrap=_write_r")
 
 include_directories(
   include

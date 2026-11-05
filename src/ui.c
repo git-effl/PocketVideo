@@ -86,7 +86,7 @@ void ui_draw_status_bar(const char *title) {
     ui_draw_text(16, 22, COLOR_BRAND_CYAN, 16, "PocketVideo (yt.chocolatemoo53.com)");
 
     if (title) {
-        ui_draw_text(380, 22, COLOR_TEXT_LIGHT, 17, title);
+        ui_draw_text_centered(480.0f, 22, COLOR_TEXT_LIGHT, 17, title);
     }
 
     ui_draw_text(850, 22, COLOR_TEXT_LIGHT, 16, "100%");
@@ -125,8 +125,7 @@ void ui_draw_bubble(float cx, float cy, float radius, const char *title,
     }
 
     if (title) {
-        float text_x = cx - (float)(strlen(title) * 4.5f);
-        ui_draw_text(text_x, cy + r + 24.0f, COLOR_TEXT_LIGHT, 16, title);
+        ui_draw_text_centered(cx, cy + r + 24.0f, COLOR_TEXT_LIGHT, 16, title);
     }
 }
 
