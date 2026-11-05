@@ -19,6 +19,11 @@ ASFLAGS = $(CFLAGS)
 
 all: $(TARGET).vpk
 
+# 1. Define param.sfo generation first so it runs before packaging
+param.sfo:
+	vita-mksfoex -s TITLE_ID=$(TITLE_ID) APP_VER="01.00" "PocketVideo" $@
+
+# 2. VPK depends on param.sfo and eboot.bin being fully ready
 %.vpk: eboot.bin param.sfo
 	vita-pack-vpk -s param.sfo -b eboot.bin \
 		--add sce_sys/icon0.png=sce_sys/icon0.png \
@@ -33,9 +38,6 @@ all: $(TARGET).vpk
 		--add assets/openssl.cnf=assets/openssl.cnf \
 		--add assets/cacert.pem=assets/cacert.pem \
 		$@
-
-param.sfo:
-	vita-mksfoex -s TITLE_ID=$(TITLE_ID) APP_VER="01.00" "PocketVideo" $@
 
 eboot.bin: $(TARGET).velf
 	vita-make-fself -c $< $@
