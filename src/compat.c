@@ -4,74 +4,79 @@
  * VitaSDK's libcurl.a was compiled against OpenSSL 1.0.2, while modern VitaSDK
  * environments provide OpenSSL 1.1.1 (vita-openssl3). This shim maps legacy
  * OpenSSL 1.0.2 symbols to OpenSSL 1.1.1 equivalents so linking succeeds.
- * It also provides a userspace implementation of sceKernelGetRandomNumber
- * which Vita3K's kernel HLE does not implement.
+ * Weak symbols are used so that OpenSSL 1.0.2 toolchains use native symbols
+ * without requiring OpenSSL 1.1.1 function exports.
  */
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <stddef.h>
 
-#if __has_include(<openssl/opensslv.h>)
-#include <openssl/opensslv.h>
-#endif
-
-#if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER >= 0x10100000L
+#define WEAK_SYM __attribute__((weak))
 
 typedef void OPENSSL_STACK;
 typedef void (*OPENSSL_sk_freefunc)(void *);
 
-extern int OPENSSL_sk_num(const OPENSSL_STACK *);
-extern void *OPENSSL_sk_value(const OPENSSL_STACK *, int);
-extern void *OPENSSL_sk_pop(OPENSSL_STACK *);
-extern void OPENSSL_sk_pop_free(OPENSSL_STACK *, OPENSSL_sk_freefunc);
+WEAK_SYM extern int OPENSSL_sk_num(const OPENSSL_STACK *);
+WEAK_SYM extern void *OPENSSL_sk_value(const OPENSSL_STACK *, int);
+WEAK_SYM extern void *OPENSSL_sk_pop(OPENSSL_STACK *);
+WEAK_SYM extern void OPENSSL_sk_pop_free(OPENSSL_STACK *, OPENSSL_sk_freefunc);
 
-extern void *EVP_MD_CTX_new(void);
-extern void EVP_MD_CTX_free(void *);
-extern unsigned long OpenSSL_version_num(void);
-extern const void *TLS_client_method(void);
-extern const void *UI_null(void);
+WEAK_SYM extern void *EVP_MD_CTX_new(void);
+WEAK_SYM extern void EVP_MD_CTX_free(void *);
+WEAK_SYM extern unsigned long OpenSSL_version_num(void);
+WEAK_SYM extern const void *TLS_client_method(void);
+WEAK_SYM extern const void *UI_null(void);
 
-extern int OPENSSL_init_ssl(uint64_t opts, const void *settings);
-extern int OPENSSL_init_crypto(uint64_t opts, const void *settings);
+WEAK_SYM extern int OPENSSL_init_ssl(uint64_t opts, const void *settings);
+WEAK_SYM extern int OPENSSL_init_crypto(uint64_t opts, const void *settings);
 
 /* Stack functions */
-int sk_num(const void *st) {
-    return OPENSSL_sk_num((const OPENSSL_STACK *)st);
+WEAK_SYM int sk_num(const void *st) {
+    if (OPENSSL_sk_num) return OPENSSL_sk_num((const OPENSSL_STACK *)st);
+    return 0;
 }
 
-void *sk_value(const void *st, int i) {
-    return OPENSSL_sk_value((const OPENSSL_STACK *)st, i);
+WEAK_SYM void *sk_value(const void *st, int i) {
+    if (OPENSSL_sk_value) return OPENSSL_sk_value((const OPENSSL_STACK *)st, i);
+    return NULL;
 }
 
-void *sk_pop(void *st) {
-    return OPENSSL_sk_pop((OPENSSL_STACK *)st);
+WEAK_SYM void *sk_pop(void *st) {
+    if (OPENSSL_sk_pop) return OPENSSL_sk_pop((OPENSSL_STACK *)st);
+    return NULL;
 }
 
-void sk_pop_free(void *st, void (*free_func)(void *)) {
-    OPENSSL_sk_pop_free((OPENSSL_STACK *)st, (OPENSSL_sk_freefunc)free_func);
+WEAK_SYM void sk_pop_free(void *st, void (*free_func)(void *)) {
+    if (OPENSSL_sk_pop_free) {
+        OPENSSL_sk_pop_free((OPENSSL_STACK *)st, (OPENSSL_sk_freefunc)free_func);
+    }
 }
 
 /* Digest / Context functions */
-void *EVP_MD_CTX_create(void) {
-    return EVP_MD_CTX_new();
+WEAK_SYM void *EVP_MD_CTX_create(void) {
+    if (EVP_MD_CTX_new) return EVP_MD_CTX_new();
+    return NULL;
 }
 
-void EVP_MD_CTX_destroy(void *ctx) {
-    EVP_MD_CTX_free(ctx);
+WEAK_SYM void EVP_MD_CTX_destroy(void *ctx) {
+    if (EVP_MD_CTX_free && ctx) EVP_MD_CTX_free(ctx);
 }
 
 /* Version & Methods */
-unsigned long SSLeay(void) {
-    return OpenSSL_version_num();
+WEAK_SYM unsigned long SSLeay(void) {
+    if (OpenSSL_version_num) return OpenSSL_version_num();
+    return 0x1000200fL;
 }
 
-const void *SSLv23_client_method(void) {
-    return TLS_client_method();
+WEAK_SYM const void *SSLv23_client_method(void) {
+    if (TLS_client_method) return TLS_client_method();
+    return NULL;
 }
 
-const void *UI_OpenSSL(void) {
-    return UI_null();
+WEAK_SYM const void *UI_OpenSSL(void) {
+    if (UI_null) return UI_null();
+    return NULL;
 }
 
 #define OPENSSL_INIT_LOAD_CONFIG       0x00000040ULL
@@ -81,26 +86,31 @@ const void *UI_OpenSSL(void) {
 #define OPENSSL_INIT_LOAD_SSL_STRINGS  0x00200000ULL
 
 /* Legacy Initialization functions */
-int SSL_library_init(void) {
-    return OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG | OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS, NULL);
+WEAK_SYM int SSL_library_init(void) {
+    if (OPENSSL_init_ssl) {
+        return OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG | OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS, NULL);
+    }
+    return 1;
 }
 
-void SSL_load_error_strings(void) {
-    OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG | OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
+WEAK_SYM void SSL_load_error_strings(void) {
+    if (OPENSSL_init_ssl) {
+        OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG | OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
+    }
 }
 
-void OPENSSL_add_all_algorithms_noconf(void) {
-    OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CONFIG | OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS, NULL);
+WEAK_SYM void OPENSSL_add_all_algorithms_noconf(void) {
+    if (OPENSSL_init_crypto) {
+        OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CONFIG | OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS, NULL);
+    }
 }
 
 /* Legacy Cleanup functions (no-ops in OpenSSL 1.1.0+) */
-void EVP_cleanup(void) {}
-void ENGINE_cleanup(void) {}
-void ERR_free_strings(void) {}
-void CONF_modules_free(void) {}
-void SSL_COMP_free_compression_methods(void) {}
-
-#endif /* OPENSSL_VERSION_NUMBER >= 0x10100000L */
+WEAK_SYM void EVP_cleanup(void) {}
+WEAK_SYM void ENGINE_cleanup(void) {}
+WEAK_SYM void ERR_free_strings(void) {}
+WEAK_SYM void CONF_modules_free(void) {}
+WEAK_SYM void SSL_COMP_free_compression_methods(void) {}
 
 /*
  * Kernel RNG replacement for Vita3K / PS Vita
