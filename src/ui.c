@@ -327,7 +327,7 @@ void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *ite
     ui_draw_text(x + thumb_w + 18.0f, y + 27.0f,
                  is_focused ? COLOR_BRAND_CYAN : COLOR_TEXT_LIGHT, 17, truncated_title);
 
-    char meta_info[256];
+    char meta_info[384];
     if (item->view_count > 0) {
         char views_buf[40];
         format_views_commas(item->view_count, views_buf, sizeof(views_buf));
@@ -412,7 +412,7 @@ void ui_draw_player_screen(const VideoItem *item, vita2d_texture *video_tex,
         }
         ui_draw_text(20, 26, RGBA8(245, 245, 248, a), 18, title_buf);
 
-        char sub_buf[192];
+        char sub_buf[384];
         if (item->view_count > 0) {
             char vbuf[40];
             format_views_commas(item->view_count, vbuf, sizeof(vbuf));
@@ -528,7 +528,7 @@ void ui_draw_description_modal(const VideoItem *item, int scroll_line) {
 
     char views_buf[40];
     format_views_commas(item->view_count, views_buf, sizeof(views_buf));
-    char meta[256];
+    char meta[384];
     snprintf(meta, sizeof(meta), "Channel: %s   |   Views: %s   |   Published: %s",
              item->author, views_buf, item->published_text[0] ? item->published_text : "N/A");
     ui_draw_text(mx + 24, my + 104, COLOR_HIGHLIGHT_AMBER, 14, meta);

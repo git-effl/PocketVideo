@@ -10,6 +10,13 @@
 
 #include <stdlib.h>
 #include <stdint.h>
+#include <stddef.h>
+
+#if __has_include(<openssl/opensslv.h>)
+#include <openssl/opensslv.h>
+#endif
+
+#if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER >= 0x10100000L
 
 typedef void OPENSSL_STACK;
 typedef void (*OPENSSL_sk_freefunc)(void *);
@@ -92,6 +99,8 @@ void ENGINE_cleanup(void) {}
 void ERR_free_strings(void) {}
 void CONF_modules_free(void) {}
 void SSL_COMP_free_compression_methods(void) {}
+
+#endif /* OPENSSL_VERSION_NUMBER >= 0x10100000L */
 
 /*
  * Kernel RNG replacement for Vita3K / PS Vita
