@@ -41,6 +41,7 @@ typedef enum {
 extern vita2d_texture *g_tex_bg;
 extern vita2d_texture *g_tex_bubble_glass;
 extern vita2d_font *g_font_noto;
+extern vita2d_font *g_font_emoji;
 extern vita2d_pvf  *g_font_pvf_fallback;
 
 int ui_init(void);

@@ -8,6 +8,7 @@ vita2d_texture *g_tex_bg           = NULL;
 vita2d_texture *g_tex_bubble_glass = NULL;
 
 vita2d_font *g_font_noto           = NULL;
+vita2d_font *g_font_emoji          = NULL;
 vita2d_pvf  *g_font_pvf_fallback   = NULL;
 
 #define THUMB_CACHE_SIZE 32
@@ -64,15 +65,19 @@ int ui_init(void) {
     vita2d_set_clear_color(COLOR_BRAND_NAVY);
     memset(s_thumb_cache, 0, sizeof(s_thumb_cache));
 
-    g_font_noto = vita2d_load_font_file("app0:assets/fonts/NotoSansSymbols2-Regular.ttf");
-    if (!g_font_noto) {
-        g_font_noto = vita2d_load_font_file("assets/fonts/NotoSansSymbols2-Regular.ttf");
-    }
-    if (!g_font_noto) {
-        g_font_noto = vita2d_load_font_file("app0:assets/fonts/NotoSans-Regular.ttf");
-    }
+    /* Load NotoSans-Regular.ttf as default font for numbers, letters & standard characters */
+    g_font_noto = vita2d_load_font_file("app0:assets/fonts/NotoSans-Regular.ttf");
     if (!g_font_noto) {
         g_font_noto = vita2d_load_font_file("assets/fonts/NotoSans-Regular.ttf");
+    }
+    if (!g_font_noto) {
+        g_font_noto = vita2d_load_font_file("app0:assets/fonts/NotoSansSymbols2-Regular.ttf");
+    }
+
+    /* Load NotoColorEmoji-Regular.ttf as emoji font */
+    g_font_emoji = vita2d_load_font_file("app0:assets/fonts/NotoColorEmoji-Regular.ttf");
+    if (!g_font_emoji) {
+        g_font_emoji = vita2d_load_font_file("assets/fonts/NotoColorEmoji-Regular.ttf");
     }
 
     if (!g_font_noto) {
@@ -103,6 +108,7 @@ void ui_clear_thumbnails(void) {
 void ui_term(void) {
     ui_clear_thumbnails();
     if (g_font_noto)         { vita2d_free_font(g_font_noto);            g_font_noto = NULL; }
+    if (g_font_emoji)        { vita2d_free_font(g_font_emoji);           g_font_emoji = NULL; }
     if (g_font_pvf_fallback) { vita2d_free_pvf(g_font_pvf_fallback);    g_font_pvf_fallback = NULL; }
     if (g_tex_bg)            { vita2d_free_texture(g_tex_bg);            g_tex_bg = NULL; }
     if (g_tex_bubble_glass)  { vita2d_free_texture(g_tex_bubble_glass);  g_tex_bubble_glass = NULL; }

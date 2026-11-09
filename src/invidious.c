@@ -49,9 +49,19 @@ void sanitize_utf8_text(const char *src, char *dst, size_t max_len) {
     while (*p && out + 1 < max_len) {
         unsigned char b = *p;
         if ((b & 0xF8) == 0xF0) {
+            unsigned char b1 = p[1], b2 = p[2], b3 = p[3];
+            if ((b1 & 0xC0) == 0x80 && (b2 & 0xC0) == 0x80 && (b3 & 0xC0) == 0x80) {
+                if (out + 4 < max_len) {
+                    dst[out++] = (char)b;
+                    dst[out++] = (char)b1;
+                    dst[out++] = (char)b2;
+                    dst[out++] = (char)b3;
+                    p += 4;
+                    continue;
+                }
+                break;
+            }
             p++;
-            for (int k = 0; k < 3 && (*p & 0xC0) == 0x80; k++) p++;
-            continue;
         } else if ((b & 0xF0) == 0xE0) {
             unsigned char b1 = p[1], b2 = p[2];
             if ((b1 & 0xC0) == 0x80 && (b2 & 0xC0) == 0x80) {
