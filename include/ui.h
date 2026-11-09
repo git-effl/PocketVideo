@@ -14,7 +14,7 @@ extern "C" {
 #define SCREEN_WIDTH  960
 #define SCREEN_HEIGHT 544
 
-// PocketVideo 2010s tactile console color palette
+/* PocketVideo console color palette */
 #define COLOR_BRAND_BLUE      RGBA8(0, 114, 206, 255)
 #define COLOR_BRAND_CYAN      RGBA8(0, 174, 239, 255)
 #define COLOR_BRAND_NAVY      RGBA8(10, 22, 44, 255)
@@ -24,7 +24,7 @@ extern "C" {
 #define COLOR_TEXT_DIM        RGBA8(170, 180, 200, 255)
 #define COLOR_HIGHLIGHT_AMBER RGBA8(255, 175, 20, 255)
 
-// Aliases for compatibility
+/* Aliases for compatibility */
 #define COLOR_VITA_BLUE COLOR_BRAND_BLUE
 #define COLOR_VITA_CYAN COLOR_BRAND_CYAN
 #define COLOR_VITA_NAVY COLOR_BRAND_NAVY
@@ -35,8 +35,7 @@ typedef enum {
     VIEW_SEARCH,
     VIEW_PLAYER,
     VIEW_SETTINGS,
-    VIEW_MODAL_DESCRIPTION,
-    VIEW_MODAL_CHANNEL
+    VIEW_CHANNEL_VIEW
 } AppView;
 
 extern vita2d_texture *g_tex_bg;
@@ -56,15 +55,16 @@ void ui_draw_status_bar(const char *title);
 void ui_draw_bubble(float cx, float cy, float radius, const char *title,
                     unsigned int base_col, int is_pressed, int is_selected);
 
-/* Search / Direct ID bar at top of Trending tab */
-void ui_draw_search_bar(const char *query, int is_search_mode);
+/* Search bar with channel search mode indicator */
+void ui_draw_search_bar(const char *query, int is_search_mode, int search_type);
 
-/* Thumbnail texture cache helpers */
+/* Thumbnail & Avatar texture cache helpers */
 vita2d_texture *ui_get_cached_thumbnail(const char *video_id);
+vita2d_texture *ui_get_cached_banner(const char *url);
 void ui_fetch_one_visible_thumbnail(const VideoList *list, int offset, int visible_count);
 void ui_clear_thumbnails(void);
 
-/* Video card (no Description button on card; Description moves to playback HUD) */
+/* Video card & Channel card rendering */
 void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *item, int is_focused);
 
 /* Playback view with fading HUD controls + Description button */
@@ -74,8 +74,13 @@ void ui_draw_player_screen(const VideoItem *item, vita2d_texture *video_tex,
                            int desc_open, int desc_scroll, const char *player_status);
 
 void ui_draw_description_modal(const VideoItem *item, int scroll_line);
-void ui_draw_channel_modal(const VideoItem *item);
-void ui_draw_corner_tab(float peel_progress);
+
+/* Channel Menu View with banner, icon, description, category tabs & video list */
+void ui_draw_channel_view(const ChannelInfo *channel, const VideoList *videos,
+                          int selected_tab, int selected_video_idx, int desc_modal_open,
+                          int desc_scroll);
+
+void ui_draw_channel_description_modal(const ChannelInfo *channel, int scroll_line);
 
 #ifdef __cplusplus
 }

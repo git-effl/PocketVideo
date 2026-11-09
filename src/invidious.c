@@ -49,14 +49,12 @@ void sanitize_utf8_text(const char *src, char *dst, size_t max_len) {
     while (*p && out + 1 < max_len) {
         unsigned char b = *p;
         if ((b & 0xF8) == 0xF0) {
-            /* Strip 4-byte UTF-8 emojis (outside BMP, unsupported in NotoSans-Regular) */
             p++;
             for (int k = 0; k < 3 && (*p & 0xC0) == 0x80; k++) p++;
             continue;
         } else if ((b & 0xF0) == 0xE0) {
             unsigned char b1 = p[1], b2 = p[2];
             if ((b1 & 0xC0) == 0x80 && (b2 & 0xC0) == 0x80) {
-                /* Skip invisible variation selectors (U+FE0E/FE0F) & ZWJ (U+200D) */
                 if ((b == 0xEF && b1 == 0xB8 && (b2 == 0x8E || b2 == 0x8F)) ||
                     (b == 0xE2 && b1 == 0x80 && b2 == 0x8D)) {
                     p += 3;
@@ -153,12 +151,12 @@ int invidious_extract_video_id(const char *input, char *out_id, size_t max_len) 
         out_id[11] = '\0';
         return 1;
     }
-
     return 0;
 }
 
 static void parse_invidious_video_object(cJSON *item, VideoItem *v) {
     memset(v, 0, sizeof(VideoItem));
+    v->is_channel = 0;
 
     cJSON *vid = cJSON_GetObjectItemCaseSensitive(item, "videoId");
     if (cJSON_IsString(vid) && vid->valuestring) {
@@ -168,9 +166,6 @@ static void parse_invidious_video_object(cJSON *item, VideoItem *v) {
     cJSON *title = cJSON_GetObjectItemCaseSensitive(item, "title");
     if (cJSON_IsString(title) && title->valuestring) {
         sanitize_utf8_text(title->valuestring, v->title, sizeof(v->title));
-    }
-    if (v->title[0] == '\0') {
-        snprintf(v->title, sizeof(v->title), "Untitled Video");
     }
 
     cJSON *author = cJSON_GetObjectItemCaseSensitive(item, "author");
@@ -189,10 +184,9 @@ static void parse_invidious_video_object(cJSON *item, VideoItem *v) {
     }
 
     cJSON *desc = cJSON_GetObjectItemCaseSensitive(item, "description");
+    if (!desc) desc = cJSON_GetObjectItemCaseSensitive(item, "descriptionShort");
     if (cJSON_IsString(desc) && desc->valuestring && desc->valuestring[0] != '\0') {
         sanitize_utf8_text(desc->valuestring, v->description, sizeof(v->description));
-    } else {
-        snprintf(v->description, sizeof(v->description), "No description provided for this video.");
     }
 
     cJSON *length = cJSON_GetObjectItemCaseSensitive(item, "lengthSeconds");
@@ -213,6 +207,55 @@ static void parse_invidious_video_object(cJSON *item, VideoItem *v) {
     if (v->id[0] != '\0') {
         snprintf(v->thumbnail_url, sizeof(v->thumbnail_url),
                  "https://i.ytimg.com/vi/%s/default.jpg", v->id);
+    }
+}
+
+static void parse_invidious_channel_object(cJSON *item, VideoItem *v) {
+    memset(v, 0, sizeof(VideoItem));
+    v->is_channel = 1;
+
+    cJSON *author_id = cJSON_GetObjectItemCaseSensitive(item, "authorId");
+    if (!author_id) author_id = cJSON_GetObjectItemCaseSensitive(item, "channelId");
+    if (cJSON_IsString(author_id) && author_id->valuestring) {
+        snprintf(v->id, sizeof(v->id), "%s", author_id->valuestring);
+        snprintf(v->author_id, sizeof(v->author_id), "%s", author_id->valuestring);
+    }
+
+    cJSON *author = cJSON_GetObjectItemCaseSensitive(item, "author");
+    if (!author) author = cJSON_GetObjectItemCaseSensitive(item, "title");
+    if (cJSON_IsString(author) && author->valuestring) {
+        sanitize_utf8_text(author->valuestring, v->title, sizeof(v->title));
+        snprintf(v->author, sizeof(v->author), "%s", v->title);
+    }
+
+    cJSON *subs = cJSON_GetObjectItemCaseSensitive(item, "subCount");
+    if (cJSON_IsNumber(subs)) v->sub_count = (long long)subs->valuedouble;
+
+    cJSON *vc = cJSON_GetObjectItemCaseSensitive(item, "videoCount");
+    if (cJSON_IsNumber(vc)) v->video_count = vc->valueint;
+
+    cJSON *desc = cJSON_GetObjectItemCaseSensitive(item, "description");
+    if (!desc) desc = cJSON_GetObjectItemCaseSensitive(item, "descriptionShort");
+    if (cJSON_IsString(desc) && desc->valuestring) {
+        sanitize_utf8_text(desc->valuestring, v->description, sizeof(v->description));
+    }
+
+    cJSON *thumbs = cJSON_GetObjectItemCaseSensitive(item, "authorThumbnails");
+    if (cJSON_IsArray(thumbs) && cJSON_GetArraySize(thumbs) > 0) {
+        cJSON *last_thumb = cJSON_GetArrayItem(thumbs, cJSON_GetArraySize(thumbs) - 1);
+        cJSON *url = cJSON_GetObjectItemCaseSensitive(last_thumb, "url");
+        if (cJSON_IsString(url) && url->valuestring) {
+            if (strncmp(url->valuestring, "//", 2) == 0) {
+                snprintf(v->thumbnail_url, sizeof(v->thumbnail_url), "https:%s", url->valuestring);
+            } else if (strncmp(url->valuestring, "http", 4) == 0) {
+                snprintf(v->thumbnail_url, sizeof(v->thumbnail_url), "%s", url->valuestring);
+            } else {
+                snprintf(v->thumbnail_url, sizeof(v->thumbnail_url), "https://yt.chocolatemoo53.com%s", url->valuestring);
+            }
+        }
+    }
+    if (v->thumbnail_url[0] == '\0' && v->id[0] != '\0') {
+        snprintf(v->thumbnail_url, sizeof(v->thumbnail_url), "https://i.ytimg.com/vi/%s/default.jpg", v->id);
     }
 }
 
@@ -253,17 +296,20 @@ static int fetch_invidious_array_endpoint(const char *endpoint, VideoList *out_l
         if (out_list->count >= MAX_VIDEOS) break;
 
         cJSON *type = cJSON_GetObjectItemCaseSensitive(item, "type");
-        if (type && cJSON_IsString(type) &&
-            strcmp(type->valuestring, "video") != 0 &&
-            strcmp(type->valuestring, "shortVideo") != 0) {
-            continue;
-        }
-
-        VideoItem parsed;
-        parse_invidious_video_object(item, &parsed);
-        if (parsed.id[0] != '\0' && !list_contains_id(out_list, parsed.id)) {
-            out_list->items[out_list->count++] = parsed;
-            added++;
+        if (type && cJSON_IsString(type) && strcmp(type->valuestring, "channel") == 0) {
+            VideoItem parsed;
+            parse_invidious_channel_object(item, &parsed);
+            if (parsed.id[0] != '\0' && !list_contains_id(out_list, parsed.id)) {
+                out_list->items[out_list->count++] = parsed;
+                added++;
+            }
+        } else {
+            VideoItem parsed;
+            parse_invidious_video_object(item, &parsed);
+            if (parsed.id[0] != '\0' && !list_contains_id(out_list, parsed.id)) {
+                out_list->items[out_list->count++] = parsed;
+                added++;
+            }
         }
     }
 
@@ -381,7 +427,6 @@ int invidious_search(const char *instance, const char *query, VideoList *out_lis
     char encoded_q[256];
     url_encode_query(query, encoded_q, sizeof(encoded_q));
 
-    /* 1. Try primary Invidious search endpoint */
     char endpoint[512];
     snprintf(endpoint, sizeof(endpoint), "%s/api/v1/search?q=%s&type=video", base_url, encoded_q);
     int inv_count = fetch_invidious_array_endpoint(endpoint, out_list);
@@ -390,7 +435,6 @@ int invidious_search(const char *instance, const char *query, VideoList *out_lis
         return inv_count;
     }
 
-    /* 2. Fallback to Piped search API if primary Invidious instance restricts /api/v1/search */
     snprintf(endpoint, sizeof(endpoint), "%s/search?q=%s&filter=videos", PIPED_FALLBACK_HOST, encoded_q);
     inv_log("[Search] Querying Piped fallback: %s", endpoint);
 
@@ -430,6 +474,85 @@ int invidious_search(const char *instance, const char *query, VideoList *out_lis
     return out_list->count;
 }
 
+int invidious_search_channels(const char *instance, const char *query, VideoList *out_list) {
+    if (!query || !out_list) return -1;
+    memset(out_list, 0, sizeof(VideoList));
+
+    const char *base_url = (instance && strlen(instance) > 0) ? instance : INVIDIOUS_DEFAULT_HOST;
+    snprintf(out_list->instance, sizeof(out_list->instance), "%s", base_url);
+
+    char encoded_q[256];
+    url_encode_query(query, encoded_q, sizeof(encoded_q));
+
+    char endpoint[512];
+    snprintf(endpoint, sizeof(endpoint), "%s/api/v1/search?q=%s&type=channel", base_url, encoded_q);
+    int inv_count = fetch_invidious_array_endpoint(endpoint, out_list);
+    if (inv_count > 0) {
+        inv_log("[Invidious] Channel search returned %d channels.", inv_count);
+        return inv_count;
+    }
+
+    snprintf(endpoint, sizeof(endpoint), "%s/search?q=%s&filter=channels", PIPED_FALLBACK_HOST, encoded_q);
+    inv_log("[Search] Querying Piped channel search fallback: %s", endpoint);
+
+    HttpResponse resp;
+    int net_status = http_get(endpoint, &resp);
+    if (net_status != 0 || !resp.data || resp.size == 0) {
+        http_response_free(&resp);
+        return (net_status != 0) ? net_status : -4;
+    }
+
+    cJSON *root = cJSON_Parse(resp.data);
+    http_response_free(&resp);
+    if (!root) return -5;
+
+    cJSON *items = cJSON_GetObjectItemCaseSensitive(root, "items");
+    if (cJSON_IsArray(items)) {
+        cJSON *item = NULL;
+        cJSON_ArrayForEach(item, items) {
+            if (out_list->count >= MAX_VIDEOS) break;
+            VideoItem ch;
+            memset(&ch, 0, sizeof(VideoItem));
+            ch.is_channel = 1;
+
+            cJSON *url = cJSON_GetObjectItemCaseSensitive(item, "url");
+            if (cJSON_IsString(url) && url->valuestring) {
+                const char *p = strstr(url->valuestring, "/channel/");
+                if (p) {
+                    snprintf(ch.id, sizeof(ch.id), "%s", p + 9);
+                    snprintf(ch.author_id, sizeof(ch.author_id), "%s", p + 9);
+                }
+            }
+
+            cJSON *name = cJSON_GetObjectItemCaseSensitive(item, "name");
+            if (cJSON_IsString(name) && name->valuestring) {
+                sanitize_utf8_text(name->valuestring, ch.title, sizeof(ch.title));
+                snprintf(ch.author, sizeof(ch.author), "%s", ch.title);
+            }
+
+            cJSON *avatar = cJSON_GetObjectItemCaseSensitive(item, "thumbnail");
+            if (cJSON_IsString(avatar) && avatar->valuestring) {
+                snprintf(ch.thumbnail_url, sizeof(ch.thumbnail_url), "%s", avatar->valuestring);
+            }
+
+            cJSON *subs = cJSON_GetObjectItemCaseSensitive(item, "subscribers");
+            if (cJSON_IsNumber(subs)) ch.sub_count = (long long)subs->valuedouble;
+
+            cJSON *desc = cJSON_GetObjectItemCaseSensitive(item, "description");
+            if (cJSON_IsString(desc) && desc->valuestring) {
+                sanitize_utf8_text(desc->valuestring, ch.description, sizeof(ch.description));
+            }
+
+            if (ch.id[0] != '\0') {
+                out_list->items[out_list->count++] = ch;
+            }
+        }
+    }
+
+    cJSON_Delete(root);
+    return out_list->count;
+}
+
 int invidious_fetch_video(const char *instance, const char *video_id, VideoItem *out_item,
                           char *out_stream_url, size_t max_stream_len) {
     if (!video_id || !out_item) return -1;
@@ -438,7 +561,6 @@ int invidious_fetch_video(const char *instance, const char *video_id, VideoItem 
     const char *base_url = (instance && strlen(instance) > 0) ? instance : INVIDIOUS_DEFAULT_HOST;
     char endpoint[512];
 
-    /* 1. Try primary Invidious /api/v1/videos/<id> */
     snprintf(endpoint, sizeof(endpoint), "%s/api/v1/videos/%s", base_url, video_id);
     HttpResponse resp;
     if (http_get(endpoint, &resp) == 0 && resp.data && resp.size > 0) {
@@ -473,15 +595,12 @@ int invidious_fetch_video(const char *instance, const char *video_id, VideoItem 
         http_response_free(&resp);
     }
 
-    /* 2. Query Piped /streams/<id> for full description & direct MP4 stream */
     snprintf(endpoint, sizeof(endpoint), "%s/streams/%s", PIPED_FALLBACK_HOST, video_id);
     inv_log("[Video] Fetching details & stream: %s", endpoint);
     if (http_get(endpoint, &resp) == 0 && resp.data && resp.size > 0) {
         cJSON *root = cJSON_Parse(resp.data);
         http_response_free(&resp);
         if (root && cJSON_IsObject(root)) {
-            snprintf(out_item->id, sizeof(out_item->id), "%s", video_id);
-
             cJSON *title = cJSON_GetObjectItemCaseSensitive(root, "title");
             if (cJSON_IsString(title) && title->valuestring) {
                 sanitize_utf8_text(title->valuestring, out_item->title, sizeof(out_item->title));
@@ -490,19 +609,9 @@ int invidious_fetch_video(const char *instance, const char *video_id, VideoItem 
             if (cJSON_IsString(uploader) && uploader->valuestring) {
                 sanitize_utf8_text(uploader->valuestring, out_item->author, sizeof(out_item->author));
             }
-            cJSON *uploader_url = cJSON_GetObjectItemCaseSensitive(root, "uploaderUrl");
-            if (cJSON_IsString(uploader_url) && uploader_url->valuestring) {
-                snprintf(out_item->author_url, sizeof(out_item->author_url), "%s", uploader_url->valuestring);
-                const char *ch = strstr(uploader_url->valuestring, "/channel/");
-                if (ch) {
-                    snprintf(out_item->author_id, sizeof(out_item->author_id), "%s", ch + 9);
-                }
-            }
             cJSON *desc = cJSON_GetObjectItemCaseSensitive(root, "description");
             if (cJSON_IsString(desc) && desc->valuestring && desc->valuestring[0] != '\0') {
                 sanitize_utf8_text(desc->valuestring, out_item->description, sizeof(out_item->description));
-            } else if (out_item->description[0] == '\0') {
-                snprintf(out_item->description, sizeof(out_item->description), "No description available for this video.");
             }
             cJSON *dur = cJSON_GetObjectItemCaseSensitive(root, "duration");
             if (cJSON_IsNumber(dur) && dur->valueint > 0) {
@@ -547,7 +656,6 @@ int invidious_fetch_video(const char *instance, const char *video_id, VideoItem 
         http_response_free(&resp);
     }
 
-    /* 3. Lightweight YouTube oEmbed fallback for direct Video ID metadata */
     snprintf(endpoint, sizeof(endpoint),
              "https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=%s&format=json",
              video_id);
@@ -578,7 +686,65 @@ int invidious_fetch_video(const char *instance, const char *video_id, VideoItem 
     return -1;
 }
 
-int invidious_fetch_channel_videos(const char *instance, const char *channel_id, VideoList *out_list) {
+int invidious_fetch_channel_info(const char *instance, const char *channel_id, ChannelInfo *out_info) {
+    if (!channel_id || !out_info) return -1;
+    memset(out_info, 0, sizeof(ChannelInfo));
+
+    const char *base_url = (instance && strlen(instance) > 0) ? instance : INVIDIOUS_DEFAULT_HOST;
+    char endpoint[512];
+    snprintf(endpoint, sizeof(endpoint), "%s/api/v1/channels/%s", base_url, channel_id);
+    inv_log("[Channel] Fetching channel metadata: %s", endpoint);
+
+    HttpResponse resp;
+    if (http_get(endpoint, &resp) == 0 && resp.data && resp.size > 0) {
+        cJSON *root = cJSON_Parse(resp.data);
+        http_response_free(&resp);
+        if (root && cJSON_IsObject(root)) {
+            snprintf(out_info->author_id, sizeof(out_info->author_id), "%s", channel_id);
+
+            cJSON *author = cJSON_GetObjectItemCaseSensitive(root, "author");
+            if (cJSON_IsString(author) && author->valuestring) {
+                sanitize_utf8_text(author->valuestring, out_info->author, sizeof(out_info->author));
+            }
+
+            cJSON *desc = cJSON_GetObjectItemCaseSensitive(root, "description");
+            if (cJSON_IsString(desc) && desc->valuestring) {
+                sanitize_utf8_text(desc->valuestring, out_info->description, sizeof(out_info->description));
+            }
+
+            cJSON *subs = cJSON_GetObjectItemCaseSensitive(root, "subCount");
+            if (cJSON_IsNumber(subs)) out_info->sub_count = (long long)subs->valuedouble;
+
+            cJSON *banners = cJSON_GetObjectItemCaseSensitive(root, "authorBanners");
+            if (cJSON_IsArray(banners) && cJSON_GetArraySize(banners) > 0) {
+                cJSON *b0 = cJSON_GetArrayItem(banners, cJSON_GetArraySize(banners) - 1);
+                cJSON *burl = cJSON_GetObjectItemCaseSensitive(b0, "url");
+                if (cJSON_IsString(burl) && burl->valuestring) {
+                    snprintf(out_info->banner_url, sizeof(out_info->banner_url), "%s", burl->valuestring);
+                }
+            }
+
+            cJSON *thumbs = cJSON_GetObjectItemCaseSensitive(root, "authorThumbnails");
+            if (cJSON_IsArray(thumbs) && cJSON_GetArraySize(thumbs) > 0) {
+                cJSON *t0 = cJSON_GetArrayItem(thumbs, cJSON_GetArraySize(thumbs) - 1);
+                cJSON *turl = cJSON_GetObjectItemCaseSensitive(t0, "url");
+                if (cJSON_IsString(turl) && turl->valuestring) {
+                    snprintf(out_info->avatar_url, sizeof(out_info->avatar_url), "%s", turl->valuestring);
+                }
+            }
+
+            cJSON_Delete(root);
+            return 0;
+        } else if (root) {
+            cJSON_Delete(root);
+        }
+    } else {
+        http_response_free(&resp);
+    }
+    return -1;
+}
+
+int invidious_fetch_channel_videos(const char *instance, const char *channel_id, const char *tab, VideoList *out_list) {
     if (!channel_id || !out_list) return -1;
     memset(out_list, 0, sizeof(VideoList));
 
@@ -586,7 +752,11 @@ int invidious_fetch_channel_videos(const char *instance, const char *channel_id,
     snprintf(out_list->instance, sizeof(out_list->instance), "%s", base_url);
 
     char endpoint[512];
-    snprintf(endpoint, sizeof(endpoint), "%s/api/v1/channels/%s/videos", base_url, channel_id);
+    if (tab && strcmp(tab, "Playlists") == 0) {
+        snprintf(endpoint, sizeof(endpoint), "%s/api/v1/channels/%s/playlists", base_url, channel_id);
+    } else {
+        snprintf(endpoint, sizeof(endpoint), "%s/api/v1/channels/%s/videos", base_url, channel_id);
+    }
     inv_log("[Invidious] Requesting channel videos: %s", endpoint);
 
     HttpResponse resp;
@@ -603,6 +773,7 @@ int invidious_fetch_channel_videos(const char *instance, const char *channel_id,
     cJSON *videos_arr = root;
     if (cJSON_IsObject(root)) {
         videos_arr = cJSON_GetObjectItemCaseSensitive(root, "videos");
+        if (!videos_arr) videos_arr = cJSON_GetObjectItemCaseSensitive(root, "playlists");
     }
 
     if (!videos_arr || !cJSON_IsArray(videos_arr)) {
@@ -613,7 +784,11 @@ int invidious_fetch_channel_videos(const char *instance, const char *channel_id,
     cJSON *item = NULL;
     cJSON_ArrayForEach(item, videos_arr) {
         if (out_list->count >= MAX_VIDEOS) break;
-        parse_invidious_video_object(item, &out_list->items[out_list->count++]);
+        VideoItem parsed;
+        parse_invidious_video_object(item, &parsed);
+        if (parsed.id[0] != '\0') {
+            out_list->items[out_list->count++] = parsed;
+        }
     }
 
     cJSON_Delete(root);

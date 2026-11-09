@@ -10,9 +10,9 @@ vita2d_texture *g_tex_bubble_glass = NULL;
 vita2d_font *g_font_noto           = NULL;
 vita2d_pvf  *g_font_pvf_fallback   = NULL;
 
-#define THUMB_CACHE_SIZE 16
+#define THUMB_CACHE_SIZE 32
 typedef struct {
-    char video_id[32];
+    char key[256];
     int attempted;
     vita2d_texture *tex;
 } ThumbCacheEntry;
@@ -64,7 +64,6 @@ int ui_init(void) {
     vita2d_set_clear_color(COLOR_BRAND_NAVY);
     memset(s_thumb_cache, 0, sizeof(s_thumb_cache));
 
-    /* Load NotoSansSymbols2-Regular.ttf as primary font for full symbol & emoji rendering */
     g_font_noto = vita2d_load_font_file("app0:assets/fonts/NotoSansSymbols2-Regular.ttf");
     if (!g_font_noto) {
         g_font_noto = vita2d_load_font_file("assets/fonts/NotoSansSymbols2-Regular.ttf");
@@ -95,7 +94,7 @@ void ui_clear_thumbnails(void) {
             vita2d_free_texture(s_thumb_cache[i].tex);
             s_thumb_cache[i].tex = NULL;
         }
-        s_thumb_cache[i].video_id[0] = '\0';
+        s_thumb_cache[i].key[0] = '\0';
         s_thumb_cache[i].attempted = 0;
     }
     s_thumb_next = 0;
@@ -110,21 +109,21 @@ void ui_term(void) {
     vita2d_fini();
 }
 
-vita2d_texture *ui_get_cached_thumbnail(const char *video_id) {
-    if (!video_id || video_id[0] == '\0') return NULL;
+vita2d_texture *ui_get_cached_thumbnail(const char *key) {
+    if (!key || key[0] == '\0') return NULL;
     for (int i = 0; i < THUMB_CACHE_SIZE; i++) {
-        if (s_thumb_cache[i].video_id[0] != '\0' &&
-            strcmp(s_thumb_cache[i].video_id, video_id) == 0) {
+        if (s_thumb_cache[i].key[0] != '\0' &&
+            strcmp(s_thumb_cache[i].key, key) == 0) {
             return s_thumb_cache[i].tex;
         }
     }
     return NULL;
 }
 
-static int is_thumbnail_attempted(const char *video_id) {
+static int is_thumbnail_attempted(const char *key) {
     for (int i = 0; i < THUMB_CACHE_SIZE; i++) {
-        if (s_thumb_cache[i].video_id[0] != '\0' &&
-            strcmp(s_thumb_cache[i].video_id, video_id) == 0) {
+        if (s_thumb_cache[i].key[0] != '\0' &&
+            strcmp(s_thumb_cache[i].key, key) == 0) {
             return s_thumb_cache[i].attempted;
         }
     }
@@ -136,24 +135,28 @@ void ui_fetch_one_visible_thumbnail(const VideoList *list, int offset, int visib
 
     for (int i = 0; i < visible_count && (offset + i) < list->count; i++) {
         const VideoItem *item = &list->items[offset + i];
-        if (item->id[0] == '\0' || item->thumbnail_url[0] == '\0') continue;
-        if (is_thumbnail_attempted(item->id)) continue;
+        const char *key = (item->thumbnail_url[0] != '\0') ? item->thumbnail_url : item->id;
+        if (key[0] == '\0') continue;
+        if (is_thumbnail_attempted(key)) continue;
 
         ThumbCacheEntry *slot = &s_thumb_cache[s_thumb_next];
         if (slot->tex) {
             vita2d_free_texture(slot->tex);
             slot->tex = NULL;
         }
-        snprintf(slot->video_id, sizeof(slot->video_id), "%s", item->id);
+        snprintf(slot->key, sizeof(slot->key), "%s", key);
         slot->attempted = 1;
         s_thumb_next = (s_thumb_next + 1) % THUMB_CACHE_SIZE;
 
         HttpResponse resp;
         if (http_get(item->thumbnail_url, &resp) == 0 && resp.data && resp.size > 0) {
             slot->tex = vita2d_load_JPEG_buffer(resp.data, (unsigned long)resp.size);
+            if (!slot->tex) {
+                slot->tex = vita2d_load_PNG_buffer(resp.data, (unsigned long)resp.size);
+            }
         }
         http_response_free(&resp);
-        return; /* Load at most 1 thumbnail per frame to keep UI responsive */
+        return;
     }
 }
 
@@ -238,15 +241,13 @@ void ui_draw_bubble(float cx, float cy, float radius, const char *title,
     }
 }
 
-void ui_draw_search_bar(const char *query, int is_search_mode) {
-    /* Search & Direct Video ID input box (x = 20..750, y = 38..72) */
-    vita2d_draw_rectangle(20, 38, 730, 34, RGBA8(8, 15, 28, 240));
-    vita2d_draw_line(20, 38, 750, 38, RGBA8(0, 174, 239, 190));
-    vita2d_draw_line(20, 72, 750, 72, RGBA8(0, 174, 239, 190));
+void ui_draw_search_bar(const char *query, int is_search_mode, int search_type) {
+    vita2d_draw_rectangle(20, 38, 700, 34, RGBA8(8, 15, 28, 240));
+    vita2d_draw_line(20, 38, 720, 38, RGBA8(0, 174, 239, 190));
+    vita2d_draw_line(20, 72, 720, 72, RGBA8(0, 174, 239, 190));
     vita2d_draw_line(20, 38, 20, 72, RGBA8(0, 174, 239, 190));
-    vita2d_draw_line(750, 38, 750, 72, RGBA8(0, 174, 239, 190));
+    vita2d_draw_line(720, 38, 720, 72, RGBA8(0, 174, 239, 190));
 
-    /* Magnifying glass icon */
     vita2d_draw_fill_circle(37, 53, 6.0f, COLOR_BRAND_CYAN);
     vita2d_draw_fill_circle(37, 53, 3.5f, RGBA8(8, 15, 28, 255));
     vita2d_draw_line(41, 57, 46, 62, COLOR_BRAND_CYAN);
@@ -254,38 +255,118 @@ void ui_draw_search_bar(const char *query, int is_search_mode) {
     if (query && query[0] != '\0') {
         char display_q[72];
         size_t qlen = strlen(query);
-        if (qlen <= 64) {
+        if (qlen <= 60) {
             snprintf(display_q, sizeof(display_q), "%s", query);
         } else {
-            memcpy(display_q, query, 64);
-            memcpy(display_q + 64, "...", 4);
+            memcpy(display_q, query, 60);
+            memcpy(display_q + 60, "...", 4);
         }
         ui_draw_text(54, 61, COLOR_TEXT_LIGHT, 15, display_q);
     } else {
         ui_draw_text(54, 61, COLOR_TEXT_DIM, 14,
-                     "Search YouTube or enter 11-char Video ID (Tap or press \xE2\x96\xA1 SQUARE)...");
+                     (search_type == 1) ? "Search Channels or enter Channel ID (Tap or press \xE2\x96\xA1 SQUARE)..."
+                                        : "Search YouTube or enter Video ID (Tap or press \xE2\x96\xA1 SQUARE)...");
     }
 
-    /* Search / Direct ID button (x = 758..858, y = 38..72) */
-    draw_button_box(758.0f, 38.0f, 100.0f, 34.0f,
-                    RGBA8(0, 130, 195, 235), COLOR_BRAND_CYAN,
-                    "Search / ID", COLOR_TEXT_LIGHT, 13);
+    /* Mode button: Videos / Channels (x = 728..818) */
+    unsigned int mode_bg = (search_type == 1) ? RGBA8(200, 45, 120, 235) : RGBA8(0, 130, 195, 235);
+    draw_button_box(728.0f, 38.0f, 90.0f, 34.0f,
+                    mode_bg, COLOR_BRAND_CYAN,
+                    (search_type == 1) ? "Channels \xE2\x96\xA1" : "Videos \xE2\x96\xA1",
+                    COLOR_TEXT_LIGHT, 12);
 
-    /* Reset to Trending / Refresh button (x = 866..940, y = 38..72) */
+    /* Search button (x = 824..880) */
+    draw_button_box(824.0f, 38.0f, 56.0f, 34.0f,
+                    RGBA8(0, 150, 215, 235), COLOR_BRAND_CYAN,
+                    "Search", COLOR_TEXT_LIGHT, 12);
+
+    /* Reset button (x = 886..940) */
     if (is_search_mode) {
-        draw_button_box(866.0f, 38.0f, 74.0f, 34.0f,
+        draw_button_box(886.0f, 38.0f, 54.0f, 34.0f,
                         RGBA8(217, 119, 6, 235), COLOR_HIGHLIGHT_AMBER,
-                        "Trending", COLOR_TEXT_LIGHT, 13);
+                        "Reset", COLOR_TEXT_LIGHT, 12);
     } else {
-        draw_button_box(866.0f, 38.0f, 74.0f, 34.0f,
+        draw_button_box(886.0f, 38.0f, 54.0f, 34.0f,
                         RGBA8(24, 44, 76, 235), RGBA8(65, 105, 165, 255),
-                        "Refresh", COLOR_TEXT_LIGHT, 13);
+                        "Refresh", COLOR_TEXT_LIGHT, 12);
     }
 }
 
 void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *item, int is_focused) {
     if (!item) return;
 
+    if (item->is_channel) {
+        /* CHANNEL SEARCH RESULT CARD */
+        unsigned int bg_col = is_focused ? RGBA8(38, 22, 54, 240) : RGBA8(18, 12, 28, 210);
+        vita2d_draw_rectangle(x, y, w, h, bg_col);
+
+        unsigned int border_col = is_focused ? COLOR_HIGHLIGHT_AMBER : RGBA8(85, 45, 115, 180);
+        vita2d_draw_line(x, y, x + w, y, border_col);
+        vita2d_draw_line(x, y + h, x + w, y + h, border_col);
+        vita2d_draw_line(x, y, x, y + h, border_col);
+        vita2d_draw_line(x + w, y, x + w, y + h, border_col);
+
+        /* Direct streamed channel round avatar icon */
+        float icon_cx = x + 40.0f;
+        float icon_cy = y + (h * 0.5f);
+        float icon_r  = 28.0f;
+
+        vita2d_draw_fill_circle(icon_cx, icon_cy, icon_r + 2.0f, COLOR_BRAND_CYAN);
+        vita2d_draw_fill_circle(icon_cx, icon_cy, icon_r, RGBA8(8, 14, 28, 255));
+
+        const char *thumb_key = (item->thumbnail_url[0] != '\0') ? item->thumbnail_url : item->id;
+        vita2d_texture *avatar = ui_get_cached_thumbnail(thumb_key);
+        if (avatar) {
+            float tw = (float)vita2d_texture_get_width(avatar);
+            float th = (float)vita2d_texture_get_height(avatar);
+            if (tw > 0.0f && th > 0.0f) {
+                float scale = (icon_r * 2.0f) / tw;
+                vita2d_draw_texture_scale(avatar, icon_cx - icon_r, icon_cy - icon_r, scale, scale);
+            }
+        }
+
+        /* Channel Name */
+        char truncated_name[58];
+        size_t nlen = strlen(item->title);
+        if (nlen <= 50) {
+            snprintf(truncated_name, sizeof(truncated_name), "%s", item->title);
+        } else {
+            memcpy(truncated_name, item->title, 50);
+            memcpy(truncated_name + 50, "...", 4);
+        }
+        ui_draw_text(x + 82.0f, y + 25.0f,
+                     is_focused ? COLOR_HIGHLIGHT_AMBER : COLOR_TEXT_LIGHT, 17, truncated_name);
+
+        /* Channel Stats & Description snippet ending in ... */
+        char stats_buf[256];
+        if (item->sub_count > 0) {
+            char sub_buf[40];
+            format_views_commas(item->sub_count, sub_buf, sizeof(sub_buf));
+            snprintf(stats_buf, sizeof(stats_buf), "Channel  *  %s subscribers", sub_buf);
+        } else {
+            snprintf(stats_buf, sizeof(stats_buf), "YouTube Channel");
+        }
+        ui_draw_text(x + 82.0f, y + 46.0f, COLOR_BRAND_CYAN, 13, stats_buf);
+
+        char desc_snippet[128];
+        size_t dlen = strlen(item->description);
+        if (dlen <= 65) {
+            snprintf(desc_snippet, sizeof(desc_snippet), "%s", item->description[0] ? item->description : "YouTube Channel");
+        } else {
+            memcpy(desc_snippet, item->description, 62);
+            memcpy(desc_snippet + 62, "...", 4);
+        }
+        ui_draw_text(x + 82.0f, y + 64.0f, COLOR_TEXT_DIM, 12, desc_snippet);
+
+        /* View Channel button */
+        draw_button_box(x + w - 128.0f, y + 22.0f, 114.0f, 32.0f,
+                        is_focused ? RGBA8(217, 119, 6, 230) : RGBA8(140, 70, 10, 180),
+                        COLOR_HIGHLIGHT_AMBER,
+                        "View Channel", COLOR_TEXT_LIGHT, 13);
+        return;
+    }
+
+    /* STANDARD VIDEO CARD */
     unsigned int bg_col = is_focused ? RGBA8(22, 42, 74, 240) : RGBA8(14, 22, 38, 210);
     vita2d_draw_rectangle(x, y, w, h, bg_col);
 
@@ -301,7 +382,8 @@ void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *ite
     float thumb_h = 64.0f;
     vita2d_draw_rectangle(thumb_x, thumb_y, thumb_w, thumb_h, RGBA8(4, 8, 14, 255));
 
-    vita2d_texture *thumb = ui_get_cached_thumbnail(item->id);
+    const char *key = (item->thumbnail_url[0] != '\0') ? item->thumbnail_url : item->id;
+    vita2d_texture *thumb = ui_get_cached_thumbnail(key);
     if (thumb) {
         float tw = (float)vita2d_texture_get_width(thumb);
         float th = (float)vita2d_texture_get_height(thumb);
@@ -345,7 +427,6 @@ void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *ite
     }
     ui_draw_text(x + thumb_w + 18.0f, y + 53.0f, COLOR_TEXT_DIM, 14, meta_info);
 
-    /* Channel button badge only */
     unsigned int chan_btn_bg = is_focused ? RGBA8(16, 185, 129, 230) : RGBA8(12, 130, 90, 170);
     unsigned int chan_btn_border = is_focused ? RGBA8(52, 211, 153, 255) : RGBA8(16, 110, 78, 210);
     draw_button_box(x + w - 118.0f, y + 22.0f, 104.0f, 30.0f,
@@ -398,7 +479,6 @@ void ui_draw_player_screen(const VideoItem *item, vita2d_texture *video_tex,
         uint8_t a = (uint8_t)(hud_alpha * 255.0f);
         uint8_t bar_a = (uint8_t)(hud_alpha * 218.0f);
 
-        /* Top fading title overlay */
         vita2d_draw_rectangle(0, 0, SCREEN_WIDTH, 58, RGBA8(8, 14, 26, bar_a));
         vita2d_draw_line(0, 58, SCREEN_WIDTH, 58, RGBA8(0, 174, 239, (uint8_t)(hud_alpha * 160.0f)));
 
@@ -423,11 +503,9 @@ void ui_draw_player_screen(const VideoItem *item, vita2d_texture *video_tex,
         }
         ui_draw_text(20, 48, RGBA8(0, 174, 239, a), 13, sub_buf);
 
-        /* Bottom fading playback controls + Description button with dedicated Square symbol */
         vita2d_draw_rectangle(0, 444, SCREEN_WIDTH, 100, RGBA8(8, 14, 26, bar_a));
         vita2d_draw_line(0, 444, SCREEN_WIDTH, 444, RGBA8(40, 68, 110, (uint8_t)(hud_alpha * 200.0f)));
 
-        /* Seek bar */
         float bar_x = 24.0f;
         float bar_y = 458.0f;
         float bar_w = 912.0f;
@@ -447,7 +525,6 @@ void ui_draw_player_screen(const VideoItem *item, vita2d_texture *video_tex,
         vita2d_draw_rectangle(bar_x, bar_y, fill_w, 6.0f, RGBA8(0, 174, 239, a));
         vita2d_draw_fill_circle(bar_x + fill_w, bar_y + 3.0f, 6.5f, RGBA8(255, 175, 20, a));
 
-        /* Elapsed / Total time */
         char cur_str[16], tot_str[16], time_label[64];
         format_duration((int)(cur_ms / 1000ULL), cur_str, sizeof(cur_str));
         if (effective_total > 0) {
@@ -461,7 +538,6 @@ void ui_draw_player_screen(const VideoItem *item, vita2d_texture *video_tex,
                  is_paused ? "  [PAUSED]" : "");
         ui_draw_text(24, 486, RGBA8(245, 245, 248, a), 14, time_label);
 
-        /* Tactile playback buttons */
         draw_button_box(240.0f, 492.0f, 104.0f, 38.0f,
                         RGBA8(22, 42, 74, bar_a), RGBA8(75, 115, 175, a),
                         "<< -10s (L)", RGBA8(245, 245, 248, a), 13);
@@ -474,12 +550,10 @@ void ui_draw_player_screen(const VideoItem *item, vita2d_texture *video_tex,
                         RGBA8(22, 42, 74, bar_a), RGBA8(75, 115, 175, a),
                         "+10s (R) >>", RGBA8(245, 245, 248, a), 13);
 
-        /* Description button: with dedicated PlayStation Square icon symbol \xE2\x96\xA1 [□] */
         draw_button_box(612.0f, 492.0f, 160.0f, 38.0f,
                         RGBA8(205, 45, 120, bar_a), RGBA8(255, 120, 190, a),
                         "Description \xE2\x96\xA1", RGBA8(245, 245, 248, a), 13);
 
-        /* Dedicated vector Square symbol outline icon on Description button */
         float sq_x = 620.0f;
         float sq_y = 504.0f;
         float sq_s = 13.0f;
@@ -512,7 +586,6 @@ void ui_draw_description_modal(const VideoItem *item, int scroll_line) {
     vita2d_draw_line(mx + mw, my, mx + mw, my + mh, RGBA8(40, 65, 105, 255));
     vita2d_draw_line(mx, my + mh, mx + mw, my + mh, RGBA8(40, 65, 105, 255));
 
-    /* Dedicated Square symbol icon in header title */
     ui_draw_text(mx + 24, my + 34, COLOR_BRAND_CYAN, 20, "Video Description & Metadata \xE2\x96\xA1");
     vita2d_draw_line(mx + 24, my + 46, mx + mw - 24, my + 46, RGBA8(30, 50, 80, 255));
 
@@ -543,68 +616,224 @@ void ui_draw_description_modal(const VideoItem *item, int scroll_line) {
     int max_visible = 10;
     if (scroll_line < 0) scroll_line = 0;
 
-    char line_buf[84];
-    while (start < len && drawn < max_visible) {
-        int take = 0;
-        while (take < 76 && (start + take) < len && desc[start + take] != '\n') {
-            take++;
+    char line_buf[88];
+    while (start < len) {
+        int take = 78;
+        if (start + take > len) take = len - start;
+
+        int space_pos = -1;
+        if (start + take < len) {
+            for (int k = take - 1; k >= 20; k--) {
+                if (desc[start + k] == ' ' || desc[start + k] == '\n') {
+                    space_pos = k;
+                    break;
+                }
+            }
         }
-        if (line_idx >= scroll_line) {
-            if (take >= (int)sizeof(line_buf)) take = (int)sizeof(line_buf) - 1;
-            memcpy(line_buf, desc + start, (size_t)take);
+        if (space_pos > 0) take = space_pos;
+
+        if (line_idx >= scroll_line && drawn < max_visible) {
+            memcpy(line_buf, desc + start, take);
             line_buf[take] = '\0';
-            ui_draw_text(mx + 36, my + 146 + (drawn * 23), COLOR_TEXT_LIGHT, 13, line_buf);
+            ui_draw_text(mx + 36, my + 144 + (drawn * 23), COLOR_TEXT_LIGHT, 14, line_buf);
             drawn++;
         }
-        start += take;
-        if (start < len && desc[start] == '\n') start++;
         line_idx++;
+        start += take;
+        while (start < len && (desc[start] == ' ' || desc[start] == '\n' || desc[start] == '\r')) start++;
     }
 
-    vita2d_draw_line(mx + 24, my + mh - 44, mx + mw - 24, my + mh - 44, RGBA8(30, 50, 80, 255));
-    ui_draw_text(mx + 24, my + mh - 18, COLOR_TEXT_DIM, 14,
-                 "D-Pad Up/Down: Scroll   |   Press SQUARE \xE2\x96\xA1 or CIRCLE to Close Description");
+    draw_button_box(mx + mw - 180.0f, my + mh - 44.0f, 156.0f, 32.0f,
+                    RGBA8(0, 130, 195, 235), COLOR_BRAND_CYAN,
+                    "Close (Circle / \xE2\x96\xA1)", COLOR_TEXT_LIGHT, 12);
 }
 
-void ui_draw_channel_modal(const VideoItem *item) {
-    if (!item) return;
+void ui_draw_channel_description_modal(const ChannelInfo *channel, int scroll_line) {
+    if (!channel) return;
 
-    vita2d_draw_rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, RGBA8(0, 0, 0, 180));
+    vita2d_draw_rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, RGBA8(0, 0, 0, 185));
 
-    float mx = 160.0f;
-    float my = 90.0f;
-    float mw = 640.0f;
-    float mh = 360.0f;
+    float mx = 90.0f;
+    float my = 54.0f;
+    float mw = 780.0f;
+    float mh = 436.0f;
 
     vita2d_draw_rectangle(mx + 6, my + 8, mw, mh, RGBA8(0, 0, 0, 140));
-    vita2d_draw_rectangle(mx, my, mw, mh, RGBA8(12, 20, 36, 245));
+    vita2d_draw_rectangle(mx, my, mw, mh, RGBA8(12, 20, 36, 248));
 
-    vita2d_draw_rectangle(mx, my, mw, 3, RGBA8(16, 185, 129, 255));
+    vita2d_draw_rectangle(mx, my, mw, 3, COLOR_HIGHLIGHT_AMBER);
     vita2d_draw_line(mx, my, mx, my + mh, RGBA8(40, 65, 105, 255));
     vita2d_draw_line(mx + mw, my, mx + mw, my + mh, RGBA8(40, 65, 105, 255));
     vita2d_draw_line(mx, my + mh, mx + mw, my + mh, RGBA8(40, 65, 105, 255));
 
-    ui_draw_text(mx + 24, my + 36, RGBA8(52, 211, 153, 255), 20, "Channel Information");
-    vita2d_draw_line(mx + 24, my + 48, mx + mw - 24, my + 48, RGBA8(30, 50, 80, 255));
+    ui_draw_text(mx + 24, my + 34, COLOR_HIGHLIGHT_AMBER, 20, "Channel Bio & Full Description \xE2\x96\xA1");
+    vita2d_draw_line(mx + 24, my + 46, mx + mw - 24, my + 46, RGBA8(30, 50, 80, 255));
 
-    ui_draw_text(mx + 24, my + 90, COLOR_TEXT_LIGHT, 22, item->author);
+    ui_draw_text(mx + 24, my + 76, COLOR_TEXT_LIGHT, 18, channel->author[0] ? channel->author : "Channel Info");
 
-    char id_buf[128];
-    snprintf(id_buf, sizeof(id_buf), "Channel ID:  %s", (strlen(item->author_id) > 0) ? item->author_id : "N/A");
-    ui_draw_text(mx + 24, my + 130, COLOR_BRAND_CYAN, 14, id_buf);
+    char sub_str[40];
+    format_views_commas(channel->sub_count, sub_str, sizeof(sub_str));
+    char meta[128];
+    snprintf(meta, sizeof(meta), "Subscribers: %s   |   ID: %s", sub_str, channel->author_id);
+    ui_draw_text(mx + 24, my + 104, COLOR_BRAND_CYAN, 14, meta);
 
-    char url_buf[160];
-    snprintf(url_buf, sizeof(url_buf), "Instance Path:  %s", (strlen(item->author_url) > 0) ? item->author_url : "/channel");
-    ui_draw_text(mx + 24, my + 160, COLOR_TEXT_DIM, 14, url_buf);
+    vita2d_draw_rectangle(mx + 24, my + 120, mw - 48, 254, RGBA8(6, 10, 18, 245));
 
-    vita2d_draw_rectangle(mx + 24, my + 190, mw - 48, 85, RGBA8(6, 10, 18, 240));
-    ui_draw_text(mx + 40, my + 224, COLOR_TEXT_LIGHT, 14, "Press CROSS to play this creator's video.");
-    ui_draw_text(mx + 40, my + 252, COLOR_HIGHLIGHT_AMBER, 13, "Powered by PocketVideo.");
+    const char *desc = (strlen(channel->description) > 0) ? channel->description : "No description provided for this channel.";
+    int len = (int)strlen(desc);
+    int start = 0;
+    int line_idx = 0;
+    int drawn = 0;
+    int max_visible = 10;
+    if (scroll_line < 0) scroll_line = 0;
 
-    vita2d_draw_line(mx + 24, my + mh - 44, mx + mw - 24, my + mh - 44, RGBA8(30, 50, 80, 255));
-    ui_draw_text(mx + 24, my + mh - 18, COLOR_TEXT_DIM, 14, "Press CIRCLE to Close   |   Press CROSS to Play Video");
+    char line_buf[88];
+    while (start < len) {
+        int take = 78;
+        if (start + take > len) take = len - start;
+
+        int space_pos = -1;
+        if (start + take < len) {
+            for (int k = take - 1; k >= 20; k--) {
+                if (desc[start + k] == ' ' || desc[start + k] == '\n') {
+                    space_pos = k;
+                    break;
+                }
+            }
+        }
+        if (space_pos > 0) take = space_pos;
+
+        if (line_idx >= scroll_line && drawn < max_visible) {
+            memcpy(line_buf, desc + start, take);
+            line_buf[take] = '\0';
+            ui_draw_text(mx + 36, my + 144 + (drawn * 23), COLOR_TEXT_LIGHT, 14, line_buf);
+            drawn++;
+        }
+        line_idx++;
+        start += take;
+        while (start < len && (desc[start] == ' ' || desc[start] == '\n' || desc[start] == '\r')) start++;
+    }
+
+    draw_button_box(mx + mw - 180.0f, my + mh - 44.0f, 156.0f, 32.0f,
+                    RGBA8(217, 119, 6, 235), COLOR_HIGHLIGHT_AMBER,
+                    "Close (Circle / \xE2\x96\xA1)", COLOR_TEXT_LIGHT, 12);
 }
 
-void ui_draw_corner_tab(float peel_progress) {
-    (void)peel_progress;
+void ui_draw_channel_view(const ChannelInfo *channel, const VideoList *videos,
+                          int selected_tab, int selected_video_idx, int desc_modal_open,
+                          int desc_scroll) {
+    vita2d_draw_rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, COLOR_BRAND_NAVY);
+
+    /* Channel Banner Header (Y: 0..110) */
+    vita2d_draw_rectangle(0, 0, SCREEN_WIDTH, 110, RGBA8(16, 28, 52, 255));
+    if (channel && channel->banner_url[0] != '\0') {
+        vita2d_texture *banner_tex = ui_get_cached_thumbnail(channel->banner_url);
+        if (banner_tex) {
+            float bw = (float)vita2d_texture_get_width(banner_tex);
+            float bh = (float)vita2d_texture_get_height(banner_tex);
+            if (bw > 0.0f && bh > 0.0f) {
+                vita2d_draw_texture_scale(banner_tex, 0, 0, (float)SCREEN_WIDTH / bw, 110.0f / bh);
+                vita2d_draw_rectangle(0, 0, SCREEN_WIDTH, 110, RGBA8(0, 0, 0, 90));
+            }
+        }
+    }
+    vita2d_draw_line(0, 110, SCREEN_WIDTH, 110, COLOR_BRAND_CYAN);
+
+    /* Channel Avatar Icon (Top Middle-Left, X: 24..94, Y: 20..90) */
+    float icon_cx = 59.0f;
+    float icon_cy = 55.0f;
+    float icon_r  = 35.0f;
+    vita2d_draw_fill_circle(icon_cx, icon_cy, icon_r + 3.0f, COLOR_HIGHLIGHT_AMBER);
+    vita2d_draw_fill_circle(icon_cx, icon_cy, icon_r, RGBA8(8, 14, 28, 255));
+
+    if (channel && channel->avatar_url[0] != '\0') {
+        vita2d_texture *avatar_tex = ui_get_cached_thumbnail(channel->avatar_url);
+        if (avatar_tex) {
+            float aw = (float)vita2d_texture_get_width(avatar_tex);
+            float ah = (float)vita2d_texture_get_height(avatar_tex);
+            if (aw > 0.0f && ah > 0.0f) {
+                float scale = (icon_r * 2.0f) / aw;
+                vita2d_draw_texture_scale(avatar_tex, icon_cx - icon_r, icon_cy - icon_r, scale, scale);
+            }
+        }
+    }
+
+    /* Channel Name & Sub Count (X: 110, Y: 46) */
+    if (channel) {
+        ui_draw_text(110, 48, COLOR_TEXT_LIGHT, 22, channel->author[0] ? channel->author : "YouTube Channel");
+
+        char sub_str[40];
+        format_views_commas(channel->sub_count, sub_str, sizeof(sub_str));
+        char stats_buf[128];
+        snprintf(stats_buf, sizeof(stats_buf), "%s subscribers", sub_str);
+        ui_draw_text(110, 72, COLOR_HIGHLIGHT_AMBER, 14, stats_buf);
+    }
+
+    /* Channel Description Snippet (Y: 118..148) */
+    vita2d_draw_rectangle(0, 111, SCREEN_WIDTH, 42, RGBA8(12, 20, 36, 245));
+    vita2d_draw_line(0, 153, SCREEN_WIDTH, 153, RGBA8(35, 55, 85, 255));
+
+    if (channel && channel->description[0] != '\0') {
+        char desc_snip[120];
+        size_t dlen = strlen(channel->description);
+        if (dlen <= 75) {
+            snprintf(desc_snip, sizeof(desc_snip), "%s", channel->description);
+        } else {
+            memcpy(desc_snip, channel->description, 72);
+            memcpy(desc_snip + 72, "...", 4);
+        }
+        ui_draw_text(20, 134, COLOR_TEXT_DIM, 13, desc_snip);
+    } else {
+        ui_draw_text(20, 134, COLOR_TEXT_DIM, 13, "Official YouTube Channel");
+    }
+
+    /* Bio button / Square hint on right of description snippet */
+    draw_button_box(SCREEN_WIDTH - 170.0f, 116.0f, 150.0f, 32.0f,
+                    RGBA8(205, 45, 120, 230), RGBA8(255, 120, 190, 255),
+                    "Full Bio \xE2\x96\xA1", COLOR_TEXT_LIGHT, 12);
+
+    /* Category Tabs: Home, Videos, Shorts, Live, Playlists (Y: 154..190) */
+    const char *tabs[] = {"Home", "Videos", "Shorts", "Live", "Playlists"};
+    int num_tabs = 5;
+    float tab_w = 176.0f;
+    float tab_start_x = 20.0f;
+    float tab_y = 158.0f;
+
+    for (int t = 0; t < num_tabs; t++) {
+        float tx = tab_start_x + (t * (tab_w + 10.0f));
+        int is_active = (t == selected_tab);
+        unsigned int bg = is_active ? RGBA8(0, 140, 210, 240) : RGBA8(18, 30, 52, 210);
+        unsigned int border = is_active ? COLOR_HIGHLIGHT_AMBER : RGBA8(40, 65, 100, 200);
+        draw_button_box(tx, tab_y, tab_w, 32.0f, bg, border, tabs[t],
+                        is_active ? COLOR_HIGHLIGHT_AMBER : COLOR_TEXT_LIGHT, 14);
+    }
+
+    /* Channel Videos Feed (Y: 196..530) */
+    int card_h = 76;
+    int gap = 8;
+    int start_y = 196;
+    int visible = 4;
+
+    int offset = 0;
+    if (selected_video_idx >= visible) {
+        offset = selected_video_idx - visible + 1;
+    }
+
+    if (videos && videos->count > 0) {
+        ui_fetch_one_visible_thumbnail(videos, offset, visible);
+
+        for (int i = 0; i < visible && (offset + i) < videos->count; i++) {
+            int idx = offset + i;
+            float cy = start_y + (i * (card_h + gap));
+            ui_draw_video_card(20, cy, 920, card_h, &videos->items[idx], (idx == selected_video_idx));
+        }
+    } else {
+        ui_draw_text_centered(480.0f, 320.0f, COLOR_TEXT_DIM, 16,
+                              "No content available under this category tab.");
+    }
+
+    /* Full Channel Description Modal */
+    if (desc_modal_open && channel) {
+        ui_draw_channel_description_modal(channel, desc_scroll);
+    }
 }
