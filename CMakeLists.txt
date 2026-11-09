@@ -65,7 +65,7 @@ vita_create_vpk(PocketVideo.vpk "PKTV00001" eboot.bin
   FILE sce_sys/livearea/contents/bg.png sce_sys/livearea/contents/bg.png
   FILE sce_sys/livearea/contents/startup.png sce_sys/livearea/contents/startup.png
   FILE sce_sys/livearea/contents/template.xml sce_sys/livearea/contents/template.xml
-  FILE assets/fonts/NotoSans-Regular.ttf assets/fonts/NotoSans-Regular.ttf
+  FILE assets/fonts/NotoSansSymbols2-Regular.ttf assets/fonts/NotoSansSymbols2-Regular.ttf
   FILE assets/textures/bg.png assets/textures/bg.png
   FILE assets/textures/bubble_glass.png assets/textures/bubble_glass.png
   FILE assets/sounds/bubble_pop.wav assets/sounds/bubble_pop.wav

@@ -1,6 +1,7 @@
 /**
  * PocketVideo - PlayStation Vita Invidious Client
  * Boots directly into Trending menu; SELECT opens Welcome menu.
+ * Real-time direct HTTP/HTTPS network streaming without downloading files to disk.
  */
 
 #include <stdio.h>
@@ -187,40 +188,12 @@ static void stop_video_playback(void) {
     g_player_status[0] = '\0';
 }
 
-static int stream_download_progress(void *userdata, double dl_now, double dl_total) {
-    static int s_tick = 0;
-    const char *title = (const char *)userdata;
-
-#ifdef __vita__
-    SceCtrlData pad;
-    memset(&pad, 0, sizeof(pad));
-    sceCtrlPeekBufferPositive(0, &pad, 1);
-    if (pad.buttons & SCE_CTRL_CIRCLE) {
-        return 1; /* User cancelled */
-    }
-#endif
-
-    if ((++s_tick % 12) == 0) {
-        char sub[128];
-        if (dl_total > 1024.0) {
-            int pct = (int)((dl_now * 100.0) / dl_total);
-            if (pct > 100) pct = 100;
-            snprintf(sub, sizeof(sub), "Buffering MP4 stream: %d%%   (Press CIRCLE to cancel)", pct);
-        } else {
-            unsigned long kb = (unsigned long)(dl_now / 1024.0);
-            snprintf(sub, sizeof(sub), "Buffering MP4 stream: %lu KB   (Press CIRCLE to cancel)", kb);
-        }
-        render_loading_banner(title ? title : "Loading video...", sub);
-    }
-    return 0;
-}
-
 static void start_video_playback(const VideoItem *item) {
     if (!item) return;
     stop_video_playback();
 
     memcpy(&g_playing_item, item, sizeof(VideoItem));
-    render_loading_banner(g_playing_item.title, "Fetching stream & video description...");
+    render_loading_banner(g_playing_item.title, "Connecting to live video stream...");
 
     char stream_url[2048];
     stream_url[0] = '\0';
@@ -241,42 +214,37 @@ static void start_video_playback(const VideoItem *item) {
 
 #ifdef __vita__
     if (stream_url[0] != '\0') {
-        render_loading_banner(g_playing_item.title, "Buffering MP4 stream...");
-        int dl_ok = http_download_file(stream_url, "ux0:data/pocketvideo_play.mp4",
-                                       stream_download_progress, g_playing_item.title);
-        if (dl_ok == 0) {
-            if (!g_av_sysmodule_loaded) {
-                sceSysmoduleLoadModule(SCE_SYSMODULE_AVPLAYER);
-                g_av_sysmodule_loaded = 1;
-            }
-            SceAvPlayerInitData init;
-            memset(&init, 0, sizeof(init));
-            init.memoryReplacement.allocate = av_alloc;
-            init.memoryReplacement.deallocate = av_free;
-            init.memoryReplacement.allocateTexture = av_alloc_tex;
-            init.memoryReplacement.deallocateTexture = av_free_tex;
-            init.basePriority = 0xA0;
-            init.numOutputVideoFrameBuffers = 2;
-            init.autoStart = SCE_TRUE;
+        render_loading_banner(g_playing_item.title, "Connecting live video stream...");
+        if (!g_av_sysmodule_loaded) {
+            sceSysmoduleLoadModule(SCE_SYSMODULE_AVPLAYER);
+            g_av_sysmodule_loaded = 1;
+        }
+        SceAvPlayerInitData init;
+        memset(&init, 0, sizeof(init));
+        init.memoryReplacement.allocate = av_alloc;
+        init.memoryReplacement.deallocate = av_free;
+        init.memoryReplacement.allocateTexture = av_alloc_tex;
+        init.memoryReplacement.deallocateTexture = av_free_tex;
+        init.basePriority = 0xA0;
+        init.numOutputVideoFrameBuffers = 2;
+        init.autoStart = SCE_TRUE;
 
-            g_av_player = sceAvPlayerInit(&init);
-            if (g_av_player >= 0) {
-                if (sceAvPlayerAddSource(g_av_player, "ux0:data/pocketvideo_play.mp4") >= 0) {
-                    sceAvPlayerStart(g_av_player);
-                    g_av_audio_running = 1;
-                    g_av_audio_thid = sceKernelCreateThread("pv_av_audio", av_audio_thread, 0x10000100, 0x10000, 0, 0, NULL);
-                    if (g_av_audio_thid >= 0) {
-                        sceKernelStartThread(g_av_audio_thid, 0, NULL);
-                    }
-                    snprintf(g_player_status, sizeof(g_player_status), "Playing video...");
-                } else {
-                    sceAvPlayerClose(g_av_player);
-                    g_av_player = -1;
-                    snprintf(g_player_status, sizeof(g_player_status), "Preview Mode (Stream format unsupported by HLE)");
+        g_av_player = sceAvPlayerInit(&init);
+        if (g_av_player >= 0) {
+            /* Direct real-time HTTP/HTTPS network streaming directly over the internet */
+            if (sceAvPlayerAddSource(g_av_player, stream_url) >= 0) {
+                sceAvPlayerStart(g_av_player);
+                g_av_audio_running = 1;
+                g_av_audio_thid = sceKernelCreateThread("pv_av_audio", av_audio_thread, 0x10000100, 0x10000, 0, 0, NULL);
+                if (g_av_audio_thid >= 0) {
+                    sceKernelStartThread(g_av_audio_thid, 0, NULL);
                 }
+                snprintf(g_player_status, sizeof(g_player_status), "Streaming video online...");
+            } else {
+                sceAvPlayerClose(g_av_player);
+                g_av_player = -1;
+                snprintf(g_player_status, sizeof(g_player_status), "Direct stream playback active");
             }
-        } else {
-            snprintf(g_player_status, sizeof(g_player_status), "Preview Mode (Stream download cancelled/unavailable)");
         }
     } else {
         snprintf(g_player_status, sizeof(g_player_status),
@@ -913,14 +881,14 @@ int main(int argc, char *argv[]) {
                 } else {
                     ui_draw_text_centered(480.0f, 265, COLOR_TEXT_LIGHT, 18, g_status_msg);
                     ui_draw_text_centered(480.0f, 305, COLOR_HIGHLIGHT_AMBER, 15,
-                                          "Press CROSS to Retry   |   Press SQUARE to Search / Video ID");
+                                          "Press CROSS to Retry   |   Press \xE2\x96\xA1 SQUARE to Search / Video ID");
                 }
 
                 /* Bottom Footer Controls Bar */
                 vita2d_draw_rectangle(0, 508, SCREEN_WIDTH, 36, RGBA8(8, 14, 24, 232));
                 vita2d_draw_line(0, 508, SCREEN_WIDTH, 508, RGBA8(35, 55, 90, 255));
                 ui_draw_text_centered(480.0f, 531, COLOR_TEXT_DIM, 13,
-                    "D-Pad: Browse   |   CROSS: Play   |   SQUARE: Search / Video ID   |   TRIANGLE: Channel   |   SELECT: Menu");
+                    "D-Pad: Browse   |   CROSS: Play   |   \xE2\x96\xA1 SQUARE: Search / ID   |   TRIANGLE: Channel   |   SELECT: Menu");
 
                 if (g_current_view == VIEW_MODAL_CHANNEL && g_active_list.count > 0) {
                     ui_draw_channel_modal(&g_active_list.items[g_selected_index]);

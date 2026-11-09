@@ -64,7 +64,14 @@ int ui_init(void) {
     vita2d_set_clear_color(COLOR_BRAND_NAVY);
     memset(s_thumb_cache, 0, sizeof(s_thumb_cache));
 
-    g_font_noto = vita2d_load_font_file("app0:assets/fonts/NotoSans-Regular.ttf");
+    /* Load NotoSansSymbols2-Regular.ttf as primary font for full symbol & emoji rendering */
+    g_font_noto = vita2d_load_font_file("app0:assets/fonts/NotoSansSymbols2-Regular.ttf");
+    if (!g_font_noto) {
+        g_font_noto = vita2d_load_font_file("assets/fonts/NotoSansSymbols2-Regular.ttf");
+    }
+    if (!g_font_noto) {
+        g_font_noto = vita2d_load_font_file("app0:assets/fonts/NotoSans-Regular.ttf");
+    }
     if (!g_font_noto) {
         g_font_noto = vita2d_load_font_file("assets/fonts/NotoSans-Regular.ttf");
     }
@@ -256,7 +263,7 @@ void ui_draw_search_bar(const char *query, int is_search_mode) {
         ui_draw_text(54, 61, COLOR_TEXT_LIGHT, 15, display_q);
     } else {
         ui_draw_text(54, 61, COLOR_TEXT_DIM, 14,
-                     "Search YouTube or enter 11-char Video ID (Tap or press SQUARE)...");
+                     "Search YouTube or enter 11-char Video ID (Tap or press \xE2\x96\xA1 SQUARE)...");
     }
 
     /* Search / Direct ID button (x = 758..858, y = 38..72) */
@@ -338,7 +345,7 @@ void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *ite
     }
     ui_draw_text(x + thumb_w + 18.0f, y + 53.0f, COLOR_TEXT_DIM, 14, meta_info);
 
-    /* Channel button badge only (Description moved into Playback HUD) */
+    /* Channel button badge only */
     unsigned int chan_btn_bg = is_focused ? RGBA8(16, 185, 129, 230) : RGBA8(12, 130, 90, 170);
     unsigned int chan_btn_border = is_focused ? RGBA8(52, 211, 153, 255) : RGBA8(16, 110, 78, 210);
     draw_button_box(x + w - 118.0f, y + 22.0f, 104.0f, 30.0f,
@@ -416,7 +423,7 @@ void ui_draw_player_screen(const VideoItem *item, vita2d_texture *video_tex,
         }
         ui_draw_text(20, 48, RGBA8(0, 174, 239, a), 13, sub_buf);
 
-        /* Bottom fading playback controls + Description button */
+        /* Bottom fading playback controls + Description button with dedicated Square symbol */
         vita2d_draw_rectangle(0, 444, SCREEN_WIDTH, 100, RGBA8(8, 14, 26, bar_a));
         vita2d_draw_line(0, 444, SCREEN_WIDTH, 444, RGBA8(40, 68, 110, (uint8_t)(hud_alpha * 200.0f)));
 
@@ -454,7 +461,7 @@ void ui_draw_player_screen(const VideoItem *item, vita2d_texture *video_tex,
                  is_paused ? "  [PAUSED]" : "");
         ui_draw_text(24, 486, RGBA8(245, 245, 248, a), 14, time_label);
 
-        /* Tactile playback buttons (all fade together with hud_alpha) */
+        /* Tactile playback buttons */
         draw_button_box(240.0f, 492.0f, 104.0f, 38.0f,
                         RGBA8(22, 42, 74, bar_a), RGBA8(75, 115, 175, a),
                         "<< -10s (L)", RGBA8(245, 245, 248, a), 13);
@@ -467,10 +474,19 @@ void ui_draw_player_screen(const VideoItem *item, vita2d_texture *video_tex,
                         RGBA8(22, 42, 74, bar_a), RGBA8(75, 115, 175, a),
                         "+10s (R) >>", RGBA8(245, 245, 248, a), 13);
 
-        /* Description button: shown when playback starts, fades out with other buttons */
+        /* Description button: with dedicated PlayStation Square icon symbol \xE2\x96\xA1 [□] */
         draw_button_box(612.0f, 492.0f, 160.0f, 38.0f,
                         RGBA8(205, 45, 120, bar_a), RGBA8(255, 120, 190, a),
-                        "Description []", RGBA8(245, 245, 248, a), 13);
+                        "Description \xE2\x96\xA1", RGBA8(245, 245, 248, a), 13);
+
+        /* Dedicated vector Square symbol outline icon on Description button */
+        float sq_x = 620.0f;
+        float sq_y = 504.0f;
+        float sq_s = 13.0f;
+        vita2d_draw_line(sq_x, sq_y, sq_x + sq_s, sq_y, RGBA8(255, 255, 255, a));
+        vita2d_draw_line(sq_x + sq_s, sq_y, sq_x + sq_s, sq_y + sq_s, RGBA8(255, 255, 255, a));
+        vita2d_draw_line(sq_x, sq_y + sq_s, sq_x + sq_s, sq_y + sq_s, RGBA8(255, 255, 255, a));
+        vita2d_draw_line(sq_x, sq_y, sq_x, sq_y + sq_s, RGBA8(255, 255, 255, a));
 
         draw_button_box(784.0f, 492.0f, 152.0f, 38.0f,
                         RGBA8(30, 44, 68, bar_a), RGBA8(120, 145, 185, a),
@@ -496,7 +512,8 @@ void ui_draw_description_modal(const VideoItem *item, int scroll_line) {
     vita2d_draw_line(mx + mw, my, mx + mw, my + mh, RGBA8(40, 65, 105, 255));
     vita2d_draw_line(mx, my + mh, mx + mw, my + mh, RGBA8(40, 65, 105, 255));
 
-    ui_draw_text(mx + 24, my + 34, COLOR_BRAND_CYAN, 20, "Video Description & Metadata");
+    /* Dedicated Square symbol icon in header title */
+    ui_draw_text(mx + 24, my + 34, COLOR_BRAND_CYAN, 20, "Video Description & Metadata \xE2\x96\xA1");
     vita2d_draw_line(mx + 24, my + 46, mx + mw - 24, my + 46, RGBA8(30, 50, 80, 255));
 
     char truncated_title[74];
@@ -546,7 +563,7 @@ void ui_draw_description_modal(const VideoItem *item, int scroll_line) {
 
     vita2d_draw_line(mx + 24, my + mh - 44, mx + mw - 24, my + mh - 44, RGBA8(30, 50, 80, 255));
     ui_draw_text(mx + 24, my + mh - 18, COLOR_TEXT_DIM, 14,
-                 "D-Pad Up/Down: Scroll   |   Press SQUARE or CIRCLE to Close Description");
+                 "D-Pad Up/Down: Scroll   |   Press SQUARE \xE2\x96\xA1 or CIRCLE to Close Description");
 }
 
 void ui_draw_channel_modal(const VideoItem *item) {
