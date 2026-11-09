@@ -4,82 +4,83 @@
  * VitaSDK's libcurl.a was compiled against OpenSSL 1.0.2, while modern VitaSDK
  * environments provide OpenSSL 1.1.1 (vita-openssl3). This shim maps legacy
  * OpenSSL 1.0.2 symbols to OpenSSL 1.1.1 equivalents so linking succeeds.
- * It also provides a userspace implementation of sceKernelGetRandomNumber
- * which Vita3K's kernel HLE does not implement.
+ * Weak references (weakref) are used so that OpenSSL 1.0.2 toolchains link cleanly
+ * without requiring OpenSSL 1.1.1 function exports.
  */
 
 #include <stdlib.h>
 #include <stdint.h>
 #include <stddef.h>
 
-#if __has_include(<openssl/opensslv.h>)
+#if __has_include(<openssl/crypto.h>)
+#include <openssl/crypto.h>
+#elif __has_include(<openssl/opensslv.h>)
 #include <openssl/opensslv.h>
 #endif
 
 #if defined(OPENSSL_VERSION_NUMBER) && OPENSSL_VERSION_NUMBER >= 0x10100000L
 
 typedef void OPENSSL_STACK;
-typedef void (*OPENSSL_sk_freefunc)(void *);
 
-extern int OPENSSL_sk_num(const OPENSSL_STACK *) __attribute__((weak));
-extern void *OPENSSL_sk_value(const OPENSSL_STACK *, int) __attribute__((weak));
-extern void *OPENSSL_sk_pop(OPENSSL_STACK *) __attribute__((weak));
-extern void OPENSSL_sk_pop_free(OPENSSL_STACK *, OPENSSL_sk_freefunc) __attribute__((weak));
+static int (*p_OPENSSL_sk_num)(const OPENSSL_STACK *) __attribute__((weakref("OPENSSL_sk_num")));
+static void *(*p_OPENSSL_sk_value)(const OPENSSL_STACK *, int) __attribute__((weakref("OPENSSL_sk_value")));
+static void *(*p_OPENSSL_sk_pop)(OPENSSL_STACK *) __attribute__((weakref("OPENSSL_sk_pop")));
+static void (*p_OPENSSL_sk_pop_free)(OPENSSL_STACK *, void (*)(void *)) __attribute__((weakref("OPENSSL_sk_pop_free")));
 
-extern void *EVP_MD_CTX_new(void) __attribute__((weak));
-extern void EVP_MD_CTX_free(void *) __attribute__((weak));
-extern unsigned long OpenSSL_version_num(void) __attribute__((weak));
-extern const void *TLS_client_method(void) __attribute__((weak));
-extern const void *UI_null(void) __attribute__((weak));
+static void *(*p_EVP_MD_CTX_new)(void) __attribute__((weakref("EVP_MD_CTX_new")));
+static void (*p_EVP_MD_CTX_free)(void *) __attribute__((weakref("EVP_MD_CTX_free")));
+static unsigned long (*p_OpenSSL_version_num)(void) __attribute__((weakref("OpenSSL_version_num")));
+static const void *(*p_TLS_client_method)(void) __attribute__((weakref("TLS_client_method")));
+static const void *(*p_UI_null)(void) __attribute__((weakref("UI_null")));
 
-extern int OPENSSL_init_ssl(uint64_t opts, const void *settings) __attribute__((weak));
-extern int OPENSSL_init_crypto(uint64_t opts, const void *settings) __attribute__((weak));
+static int (*p_OPENSSL_init_ssl)(uint64_t, const void *) __attribute__((weakref("OPENSSL_init_ssl")));
+static int (*p_OPENSSL_init_crypto)(uint64_t, const void *) __attribute__((weakref("OPENSSL_init_crypto")));
 
 /* Stack functions */
 int __attribute__((weak)) sk_num(const void *st) {
-    if (OPENSSL_sk_num) return OPENSSL_sk_num((const OPENSSL_STACK *)st);
+    if (p_OPENSSL_sk_num) return p_OPENSSL_sk_num((const OPENSSL_STACK *)st);
     return 0;
 }
 
 void * __attribute__((weak)) sk_value(const void *st, int i) {
-    if (OPENSSL_sk_value) return OPENSSL_sk_value((const OPENSSL_STACK *)st, i);
+    if (p_OPENSSL_sk_value) return p_OPENSSL_sk_value((const OPENSSL_STACK *)st, i);
     return NULL;
 }
 
 void * __attribute__((weak)) sk_pop(void *st) {
-    if (OPENSSL_sk_pop) return OPENSSL_sk_pop((OPENSSL_STACK *)st);
+    if (p_OPENSSL_sk_pop) return p_OPENSSL_sk_pop((OPENSSL_STACK *)st);
     return NULL;
 }
 
 void __attribute__((weak)) sk_pop_free(void *st, void (*free_func)(void *)) {
-    if (OPENSSL_sk_pop_free) {
-        OPENSSL_sk_pop_free((OPENSSL_STACK *)st, (OPENSSL_sk_freefunc)free_func);
+    if (p_OPENSSL_sk_pop_free) {
+        p_OPENSSL_sk_pop_free((OPENSSL_STACK *)st, free_func);
     }
 }
 
 /* Digest / Context functions */
 void * __attribute__((weak)) EVP_MD_CTX_create(void) {
-    if (EVP_MD_CTX_new) return EVP_MD_CTX_new();
+    if (p_EVP_MD_CTX_new) return p_EVP_MD_CTX_new();
     return NULL;
 }
 
 void __attribute__((weak)) EVP_MD_CTX_destroy(void *ctx) {
-    if (EVP_MD_CTX_free && ctx) EVP_MD_CTX_free(ctx);
+    if (p_EVP_MD_CTX_free && ctx) p_EVP_MD_CTX_free(ctx);
 }
 
 /* Version & Methods */
 unsigned long __attribute__((weak)) SSLeay(void) {
-    if (OpenSSL_version_num) return OpenSSL_version_num();
+    if (p_OpenSSL_version_num) return p_OpenSSL_version_num();
     return 0x1000200fL;
 }
 
 const void * __attribute__((weak)) SSLv23_client_method(void) {
-    if (TLS_client_method) return TLS_client_method();
+    if (p_TLS_client_method) return p_TLS_client_method();
     return NULL;
 }
 
 const void * __attribute__((weak)) UI_OpenSSL(void) {
-    if (UI_null) return UI_null();
+    if (p_UI_null) return p_UI_null();
     return NULL;
 }
 
@@ -91,21 +92,21 @@ const void * __attribute__((weak)) UI_OpenSSL(void) {
 
 /* Legacy Initialization functions */
 int __attribute__((weak)) SSL_library_init(void) {
-    if (OPENSSL_init_ssl) {
-        return OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG | OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS, NULL);
+    if (p_OPENSSL_init_ssl) {
+        return p_OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG | OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS, NULL);
     }
     return 1;
 }
 
 void __attribute__((weak)) SSL_load_error_strings(void) {
-    if (OPENSSL_init_ssl) {
-        OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG | OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
+    if (p_OPENSSL_init_ssl) {
+        p_OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG | OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
     }
 }
 
 void __attribute__((weak)) OPENSSL_add_all_algorithms_noconf(void) {
-    if (OPENSSL_init_crypto) {
-        OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CONFIG | OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS, NULL);
+    if (p_OPENSSL_init_crypto) {
+        p_OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CONFIG | OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS, NULL);
     }
 }
 
