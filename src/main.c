@@ -29,6 +29,38 @@
 #include "invidious.h"
 #include "ui.h"
 
+/* Button mapping aliases for VitaSDK compatibility */
+#ifndef PSP2_CTRL_SELECT
+#define PSP2_CTRL_SELECT SCE_CTRL_SELECT
+#endif
+#ifndef PSP2_CTRL_START
+#define PSP2_CTRL_START SCE_CTRL_START
+#endif
+#ifndef PSP2_CTRL_UP
+#define PSP2_CTRL_UP SCE_CTRL_UP
+#endif
+#ifndef PSP2_CTRL_DOWN
+#define PSP2_CTRL_DOWN SCE_CTRL_DOWN
+#endif
+#ifndef PSP2_CTRL_LEFT
+#define PSP2_CTRL_LEFT SCE_CTRL_LEFT
+#endif
+#ifndef PSP2_CTRL_RIGHT
+#define PSP2_CTRL_RIGHT SCE_CTRL_RIGHT
+#endif
+#ifndef PSP2_CTRL_CROSS
+#define PSP2_CTRL_CROSS SCE_CTRL_CROSS
+#endif
+#ifndef PSP2_CTRL_CIRCLE
+#define PSP2_CTRL_CIRCLE SCE_CTRL_CIRCLE
+#endif
+#ifndef PSP2_CTRL_SQUARE
+#define PSP2_CTRL_SQUARE SCE_CTRL_SQUARE
+#endif
+#ifndef PSP2_CTRL_TRIANGLE
+#define PSP2_CTRL_TRIANGLE SCE_CTRL_TRIANGLE
+#endif
+
 static VideoList g_trending_cache;
 static VideoList g_active_list;
 static VideoList g_channel_videos;
@@ -359,7 +391,6 @@ static void open_keyboard(const char *title, const char *initial_text) {
     sceImeDialogParamInit(&param);
     param.sdkVersion = 0x03500010;
     param.supportedLanguages = 0x0001FFFF;
-    param.languagesForTactileKeyboard = 0x0001FFFF;
     param.title = s_ime_title;
     param.initialText = s_ime_init_text;
     param.inputTextBuffer = s_ime_input_buf;
@@ -398,7 +429,7 @@ int main(int argc, char *argv[]) {
     main_log("[Main] PocketVideo initialized.");
 
     render_loading_banner("Connecting to Network...", "Initializing Invidious API...");
-    if (network_init() == 0) {
+    if (net_init() == 0) {
         g_network_ready = 1;
         int count = invidious_fetch_trending(INVIDIOUS_DEFAULT_HOST, &g_trending_cache);
         if (count > 0) {
@@ -693,7 +724,7 @@ int main(int argc, char *argv[]) {
     }
 
     stop_video_playback();
-    network_term();
+    net_term();
     ui_term();
     return 0;
 }
