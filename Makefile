@@ -26,7 +26,9 @@ all: $(TARGET).vpk
 		--add sce_sys/livearea/contents/bg.png=sce_sys/livearea/contents/bg.png \
 		--add sce_sys/livearea/contents/startup.png=sce_sys/livearea/contents/startup.png \
 		--add sce_sys/livearea/contents/template.xml=sce_sys/livearea/contents/template.xml \
-		--add assets/fonts/NotoSansSymbols2-Regular.ttf=assets/fonts/NotoSansSymbols2-Regular.ttf \
+		--add assets/fonts/NotoSans-Regular.ttf=assets/fonts/NotoSans-Regular.ttf \
+		--add assets/fonts/NotoColorEmoji-Regular.ttf=assets/fonts/NotoColorEmoji-Regular.ttf \
+		--add assets/fonts/NotoSansJP-Regular.ttf=assets/fonts/NotoSansJP-Regular.ttf \
 		--add assets/textures/bg.png=assets/textures/bg.png \
 		--add assets/textures/bubble_glass.png=assets/textures/bubble_glass.png \
 		--add assets/sounds/bubble_pop.wav=assets/sounds/bubble_pop.wav \
