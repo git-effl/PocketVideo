@@ -1,0 +1,249 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index a1eb890..61563ae 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -68,7 +68,5 @@ vita_create_vpk(PocketVideo.vpk "PKTV00001" eboot.bin
+   FILE assets/textures/bubble_glass.png assets/textures/bubble_glass.png
+   FILE assets/sounds/bubble_pop.wav assets/sounds/bubble_pop.wav
+   FILE assets/sounds/peel.wav assets/sounds/peel.wav
+-  FILE assets/openssl.cnf assets/openssl.cnf
+-  FILE assets/openssl.cnf usr/local/vitasdk/arm-vita-eabi/ssl/openssl.cnf
+   FILE assets/cacert.pem assets/cacert.pem
+ )
+diff --git a/Makefile b/Makefile
+index 0fb2d92..b720f10 100644
+--- a/Makefile
++++ b/Makefile
+@@ -28,8 +28,6 @@ all: $(TARGET).vpk
+ 		--add assets/textures/bubble_glass.png=assets/textures/bubble_glass.png \
+ 		--add assets/sounds/bubble_pop.wav=assets/sounds/bubble_pop.wav \
+ 		--add assets/sounds/peel.wav=assets/sounds/peel.wav \
+-		--add assets/openssl.cnf=assets/openssl.cnf \
+-		--add assets/openssl.cnf=usr/local/vitasdk/arm-vita-eabi/ssl/openssl.cnf \
+ 		--add assets/cacert.pem=assets/cacert.pem \
+ 		$@
+ 
+diff --git a/README.md b/README.md
+index a476968..758b545 100644
+--- a/README.md
++++ b/README.md
+@@ -1,6 +1,6 @@
+ # PocketVideo
+ 
+-A dedicated video client front-end that streams videos directly from public Invidious API instances (defaulting to `https://invidious.f5.si`). Designed with a classic 2010s tactile console user interface featuring glossy bubbles, corner tabs, and textured layouts.
++A dedicated video client front-end that streams videos directly from public Invidious API instances (defaulting to `https://yt.chocolatemoo53.com`). Designed with a classic 2010s tactile console user interface featuring glossy bubbles, corner tabs, and textured layouts.
+ 
+ ## Recommended Tech Stack
+ - **Toolchain**: C99 Cross-Compiler (`arm-vita-eabi-gcc` or standard embedded GCC toolchain)
+@@ -29,9 +29,6 @@ PocketVideo/
+ │   └── ui.c                    # Bubble, bevel, & tactile rendering
+ ├── assets/                     # Custom UI textures & sounds (CC0)
+ │   ├── OPENSSL                 # Apache License 2.0
+-│   ├── openssl.cnf             # OpenSSL module
+-│   ├── MPL                     # Mozilla Public License 2.0
+-│   ├── cacert.pem              # cURL module
+ │   ├── fonts/
+ │   │   ├── NotoSans-Regular.ttf# Noto Sans TrueType font
+ │   │   └── OFL                 # SIL Open Font License 1.1
+@@ -66,9 +63,9 @@ make
+ ```
+ 
+ ### Testing with Invidious Endpoint
+-PocketVideo queries `https://invidious.f5.si/api/v1/trending` by default. You can test the endpoint directly using curl:
++PocketVideo queries `https://yt.chocolatemoo53.com/api/v1/trending` by default. You can test the endpoint directly using curl:
+ ```bash
+-curl -s "https://invidious.f5.si/api/v1/trending" | jq .
++curl -s "https://yt.chocolatemoo53.com/api/v1/trending" | jq .
+ ```
+ ## LLM DISCLAMER
+ 
+diff --git a/assets/openssl.cnf b/assets/openssl.cnf
+deleted file mode 100644
+index ad14af2..0000000
+--- a/assets/openssl.cnf
++++ /dev/null
+@@ -1,12 +0,0 @@
+-# OpenSSL configuration for PocketVideo on PS Vita / Vita3K
+-openssl_conf = default_conf
+-
+-[default_conf]
+-ssl_conf = ssl_sect
+-
+-[ssl_sect]
+-system_default = system_default_sect
+-
+-[system_default_sect]
+-MinProtocol = TLSv1.2
+-CipherString = DEFAULT:@SECLEVEL=1
+diff --git a/include/invidious.h b/include/invidious.h
+index 973b9cc..5f18f4e 100644
+--- a/include/invidious.h
++++ b/include/invidious.h
+@@ -8,7 +8,7 @@ extern "C" {
+ #endif
+ 
+ #define MAX_VIDEOS 50
+-#define INVIDIOUS_DEFAULT_HOST "https://invidious.f5.si"
++#define INVIDIOUS_DEFAULT_HOST "https://yt.chocolatemoo53.com"
+ 
+ typedef struct {
+     char id[32];
+diff --git a/include/network.h b/include/network.h
+index 933a7d0..e56378c 100644
+--- a/include/network.h
++++ b/include/network.h
+@@ -30,7 +30,7 @@ void net_term(void);
+  * Perform an HTTP GET request to the given URL using libcurl.
+  * Handles timeouts, SSL verification / CA bundle fallback, and dynamic buffer allocation.
+  *
+- * @param url Full target URL (e.g. "https://invidious.f5.si/api/v1/trending")
++ * @param url Full target URL (e.g. "https://yt.chocolatemoo53.com/api/v1/trending")
+  * @param out_response Pointer to HttpResponse structure to populate
+  * @return 0 on HTTP 200 success, non-zero on network or HTTP error.
+  */
+diff --git a/src/compat.c b/src/compat.c
+index c69bbe9..9986ca8 100644
+--- a/src/compat.c
++++ b/src/compat.c
+@@ -67,19 +67,42 @@ const void *UI_OpenSSL(void) {
+     return UI_null();
+ }
+ 
++#define OPENSSL_INIT_NO_LOAD_CONFIG    0x00000080ULL
++#define OPENSSL_INIT_ADD_ALL_CIPHERS   0x00000004ULL
++#define OPENSSL_INIT_ADD_ALL_DIGESTS   0x00000008ULL
++#define OPENSSL_INIT_LOAD_CRYPTO_STRINGS 0x00000002ULL
++#define OPENSSL_INIT_LOAD_SSL_STRINGS  0x00200000ULL
++
+ /* Legacy Initialization functions */
+ int SSL_library_init(void) {
+-    return OPENSSL_init_ssl(0, NULL);
++    return OPENSSL_init_ssl(OPENSSL_INIT_NO_LOAD_CONFIG | OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS, NULL);
+ }
+ 
+ void SSL_load_error_strings(void) {
+-    OPENSSL_init_ssl(0x00200000L | 0x00000002L, NULL);
++    OPENSSL_init_ssl(OPENSSL_INIT_NO_LOAD_CONFIG | OPENSSL_INIT_LOAD_SSL_STRINGS | OPENSSL_INIT_LOAD_CRYPTO_STRINGS, NULL);
+ }
+ 
+ void OPENSSL_add_all_algorithms_noconf(void) {
+-    OPENSSL_init_crypto(0x00000004L | 0x00000008L, NULL);
++    OPENSSL_init_crypto(OPENSSL_INIT_NO_LOAD_CONFIG | OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS, NULL);
++}
++
++/* OpenSSL config file & dynamic module overrides: completely eliminate any app0:/openssl.cnf lookup */
++void OPENSSL_load_builtin_modules(void) {}
++
++int CONF_modules_load_file(const char *filename, const char *appname, unsigned long flags) {
++    return 1;
++}
++
++int CONF_modules_load(const void *cnf, const char *appname, unsigned long flags) {
++    return 1;
++}
++
++int OPENSSL_config(const char *config_name) {
++    return 1;
+ }
+ 
++void OPENSSL_no_config(void) {}
++
+ /* Legacy Cleanup functions (no-ops in OpenSSL 1.1.0+) */
+ void EVP_cleanup(void) {}
+ void ENGINE_cleanup(void) {}
+@@ -87,6 +110,25 @@ void ERR_free_strings(void) {}
+ void CONF_modules_free(void) {}
+ void SSL_COMP_free_compression_methods(void) {}
+ 
++/*
++ * Safe cycle & bus timer stubs:
++ * OpenSSL default ARM implementations execute CP15 co-processor instructions
++ * (mrc p15, 0, %0, c9, c13, 0) which Vita3K Dynarmic JIT emulator does not support.
++ */
++uint32_t OPENSSL_rdtsc(void) {
++    static uint32_t counter = 0x12345678;
++    counter = counter * 1103515245u + 12345u;
++    return counter;
++}
++
++size_t OPENSSL_instrument_bus(int *out, size_t cnt) {
++    return 0;
++}
++
++size_t OPENSSL_instrument_bus2(int *out, size_t cnt, size_t max) {
++    return 0;
++}
++
+ /*
+  * Kernel RNG replacement for Vita3K / PS Vita
+  * OpenSSL 1.1.1 (vita-openssl3) calls sceKernelGetRandomNumber to seed its PRNG.
+diff --git a/src/main.c b/src/main.c
+index 9f62439..b63f2c4 100644
+--- a/src/main.c
++++ b/src/main.c
+@@ -1,6 +1,6 @@
+ /**
+  * PocketVideo - Invidious Video Client
+- * Target API: https://invidious.f5.si/api/v1/trending
++ * Target API: https://yt.chocolatemoo53.com/api/v1/trending
+  */
+ 
+ #include <stdio.h>
+@@ -32,8 +32,8 @@ int main(int argc, char *argv[]) {
+     printf("=========================================\n");
+ 
+     setenv("OPENSSL_armcap", "0", 1);
+-    setenv("OPENSSL_CONF", "app0:assets/openssl.cnf", 1);
+-    setenv("SSL_CERT_FILE", "app0:assets/cacert.pem", 1);
++    unsetenv("OPENSSL_CONF");
++    unsetenv("SSL_CERT_FILE");
+ 
+ #ifdef __vita__
+     sceCtrlSetSamplingMode(SCE_CTRL_MODE_ANALOG);
+@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
+         snprintf(g_status_msg, sizeof(g_status_msg), "Network ready. Fetching trending...");
+     }
+ 
+-    // 3. Fetch Trending Videos from https://invidious.f5.si/api/v1/trending
++    // 3. Fetch Trending Videos from https://yt.chocolatemoo53.com/api/v1/trending
+     if (g_network_ready) {
+         printf("[Main] Contacting %s/api/v1/trending...\n", INVIDIOUS_DEFAULT_HOST);
+         int count = invidious_fetch_trending(INVIDIOUS_DEFAULT_HOST, &g_trending);
+diff --git a/src/network.c b/src/network.c
+index b1cec0c..3dd54a3 100644
+--- a/src/network.c
++++ b/src/network.c
+@@ -39,8 +39,8 @@ static size_t write_memory_callback(void *contents, size_t size, size_t nmemb, v
+ 
+ int net_init(void) {
+     setenv("OPENSSL_armcap", "0", 1);
+-    setenv("OPENSSL_CONF", "app0:assets/openssl.cnf", 1);
+-    setenv("SSL_CERT_FILE", "app0:assets/cacert.pem", 1);
++    unsetenv("OPENSSL_CONF");
++    unsetenv("SSL_CERT_FILE");
+ 
+ #ifdef __vita__
+     sceSysmoduleLoadModule(SCE_SYSMODULE_NET);
+@@ -115,6 +115,9 @@ int http_get(const char *url, HttpResponse *out_response) {
+     curl_easy_setopt(curl_handle, CURLOPT_SSLVERSION, CURL_SSLVERSION_TLSv1_2);
+     curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYPEER, 0L);
+     curl_easy_setopt(curl_handle, CURLOPT_SSL_VERIFYHOST, 0L);
++    curl_easy_setopt(curl_handle, CURLOPT_CAINFO, NULL);
++    curl_easy_setopt(curl_handle, CURLOPT_CAPATH, NULL);
++    curl_easy_setopt(curl_handle, CURLOPT_SSL_CIPHER_LIST, "DEFAULT:!aNULL:!eNULL:!MD5");
+     curl_easy_setopt(curl_handle, CURLOPT_NOPROGRESS, 1L);
+ 
+     struct curl_slist *headers = NULL;
+diff --git a/src/ui.c b/src/ui.c
+index b3f8951..1a42926 100644
+--- a/src/ui.c
++++ b/src/ui.c
+@@ -66,7 +66,7 @@ void ui_draw_status_bar(const char *title) {
+     vita2d_draw_rectangle(0, 0, SCREEN_WIDTH, 32, RGBA8(8, 14, 24, 235));
+     vita2d_draw_line(0, 32, SCREEN_WIDTH, 32, RGBA8(35, 55, 90, 255));
+ 
+-    ui_draw_text(16, 22, COLOR_BRAND_CYAN, 16, "PocketVideo (invidious.f5.si)");
++    ui_draw_text(16, 22, COLOR_BRAND_CYAN, 16, "PocketVideo (yt.chocolatemoo53.com)");
+ 
+     if (title) {
+         ui_draw_text(380, 22, COLOR_TEXT_LIGHT, 17, title);

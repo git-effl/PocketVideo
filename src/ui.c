@@ -158,7 +158,7 @@ void ui_fetch_one_visible_thumbnail(const VideoList *list, int offset, int visib
         if (http_get(item->thumbnail_url, &resp) == 0 && resp.data && resp.size > 0) {
             slot->tex = vita2d_load_JPEG_buffer(resp.data, (unsigned long)resp.size);
             if (!slot->tex) {
-                slot->tex = vita2d_load_PNG_buffer(resp.data, (unsigned long)resp.size);
+                slot->tex = vita2d_load_PNG_buffer(resp.data);
             }
         }
         http_response_free(&resp);

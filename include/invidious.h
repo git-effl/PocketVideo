@@ -14,7 +14,7 @@ extern "C" {
 typedef struct {
     char id[64];             /* Video ID or Channel ID */
     char title[256];         /* Video title or Channel name */
-    char author[128];        /* Channel author/owner name */
+    char author[256];        /* Channel author/owner name */
     char author_id[64];      /* Channel ID (e.g. UC...) */
     char author_url[128];
     char description[2048];  /* Video or Channel description */
@@ -29,7 +29,7 @@ typedef struct {
 } VideoItem;
 
 typedef struct {
-    char author[128];
+    char author[256];
     char author_id[64];
     char author_url[128];
     char description[2048];

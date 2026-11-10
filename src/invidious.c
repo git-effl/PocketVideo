@@ -235,7 +235,8 @@ static void parse_invidious_channel_object(cJSON *item, VideoItem *v) {
     if (!author) author = cJSON_GetObjectItemCaseSensitive(item, "title");
     if (cJSON_IsString(author) && author->valuestring) {
         sanitize_utf8_text(author->valuestring, v->title, sizeof(v->title));
-        snprintf(v->author, sizeof(v->author), "%s", v->title);
+        strncpy(v->author, v->title, sizeof(v->author) - 1);
+        v->author[sizeof(v->author) - 1] = '\0';
     }
 
     cJSON *subs = cJSON_GetObjectItemCaseSensitive(item, "subCount");
@@ -537,7 +538,8 @@ int invidious_search_channels(const char *instance, const char *query, VideoList
             cJSON *name = cJSON_GetObjectItemCaseSensitive(item, "name");
             if (cJSON_IsString(name) && name->valuestring) {
                 sanitize_utf8_text(name->valuestring, ch.title, sizeof(ch.title));
-                snprintf(ch.author, sizeof(ch.author), "%s", ch.title);
+                strncpy(ch.author, ch.title, sizeof(ch.author) - 1);
+                ch.author[sizeof(ch.author) - 1] = '\0';
             }
 
             cJSON *avatar = cJSON_GetObjectItemCaseSensitive(item, "thumbnail");
