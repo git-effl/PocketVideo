@@ -423,14 +423,13 @@ static void update_keyboard(void) {
         char search_buf[128] = "";
         utf16_to_utf8(s_ime_input_buf, search_buf, sizeof(search_buf));
 
-        /* If user pressed Enter, START, or submitted non-empty text (and did not cancel) */
-        if (result.button != SCE_IME_DIALOG_BUTTON_CLOSE && search_buf[0] != '\0') {
-            perform_search(search_buf);
-        }
-
         sceImeDialogTerm();
         g_ime_active = 0;
         g_ignore_tap_frames = 20;
+
+        if (search_buf[0] != '\0') {
+            perform_search(search_buf);
+        }
     }
 }
 #endif
