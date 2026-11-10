@@ -60,6 +60,12 @@
 #ifndef PSP2_CTRL_TRIANGLE
 #define PSP2_CTRL_TRIANGLE SCE_CTRL_TRIANGLE
 #endif
+#ifndef SCE_IME_DIALOG_BUTTON_ENTER
+#define SCE_IME_DIALOG_BUTTON_ENTER 1
+#endif
+#ifndef SCE_IME_DIALOG_BUTTON_CLOSE
+#define SCE_IME_DIALOG_BUTTON_CLOSE 2
+#endif
 
 static VideoList g_trending_cache;
 static VideoList g_active_list;
@@ -413,11 +419,15 @@ static void update_keyboard(void) {
         SceImeDialogResult result;
         memset(&result, 0, sizeof(result));
         sceImeDialogGetResult(&result);
-        if (result.button == SCE_IME_DIALOG_BUTTON_ENTER) {
-            char search_buf[128];
-            utf16_to_utf8(s_ime_input_buf, search_buf, sizeof(search_buf));
+        
+        char search_buf[128] = "";
+        utf16_to_utf8(s_ime_input_buf, search_buf, sizeof(search_buf));
+
+        /* If user pressed Enter, START, or submitted non-empty text (and did not cancel) */
+        if (result.button != SCE_IME_DIALOG_BUTTON_CLOSE && search_buf[0] != '\0') {
             perform_search(search_buf);
         }
+
         sceImeDialogTerm();
         g_ime_active = 0;
         g_ignore_tap_frames = 20;
@@ -523,11 +533,15 @@ int main(int argc, char *argv[]) {
         }
         /* VIEW: TRENDING / SEARCH LIST */
         else if (g_current_view == VIEW_TRENDING_LIST) {
-            /* Open Search Keyboard: Triangle button (PSP2_CTRL_TRIANGLE) opens keyboard */
-            if (btn_pressed & PSP2_CTRL_TRIANGLE) {
+            /* Open/Execute Search: START button or TRIANGLE button */
+            if ((btn_pressed & PSP2_CTRL_START) || (btn_pressed & PSP2_CTRL_TRIANGLE)) {
+                if (g_search_query[0] != '\0' && (btn_pressed & PSP2_CTRL_START)) {
+                    perform_search(g_search_query);
+                } else {
 #ifdef __vita__
-                open_keyboard("Search YouTube or Channels", g_search_query);
+                    open_keyboard("Search YouTube or Channels", g_search_query);
 #endif
+                }
             }
 
             /* Toggle Search Mode: Square button (PSP2_CTRL_SQUARE) toggles between Video and Channel search */
