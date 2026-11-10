@@ -308,6 +308,8 @@ static void open_channel_view(const char *channel_id) {
     g_current_view = VIEW_CHANNEL_VIEW;
 }
 
+static int g_ignore_tap_frames = 0;
+
 static void perform_search(const char *query) {
     if (!query || query[0] == '\0') return;
     snprintf(g_search_query, sizeof(g_search_query), "%s", query);
@@ -333,6 +335,7 @@ static void perform_search(const char *query) {
     }
     g_selected_index = 0;
     g_current_view = VIEW_TRENDING_LIST;
+    g_ignore_tap_frames = 20; /* Ignore touch clicks leftover from Submit button on IME keyboard */
 }
 
 #ifdef __vita__
@@ -406,17 +409,18 @@ static void open_keyboard(const char *title, const char *initial_text) {
 static void update_keyboard(void) {
     if (!g_ime_active) return;
     SceCommonDialogStatus status = sceImeDialogGetStatus();
-    if (status == SCE_COMMON_DIALOG_STATUS_FINISHED) {
+    if (status == SCE_COMMON_DIALOG_STATUS_FINISHED || status == SCE_COMMON_DIALOG_STATUS_CANCELED) {
         SceImeDialogResult result;
         memset(&result, 0, sizeof(result));
         sceImeDialogGetResult(&result);
-        if (result.button == SCE_IME_DIALOG_BUTTON_ENTER) {
+        if (status == SCE_COMMON_DIALOG_STATUS_FINISHED && result.button == SCE_IME_DIALOG_BUTTON_ENTER) {
             char search_buf[128];
             utf16_to_utf8(s_ime_input_buf, search_buf, sizeof(search_buf));
             perform_search(search_buf);
         }
         sceImeDialogTerm();
         g_ime_active = 0;
+        g_ignore_tap_frames = 20;
     }
 }
 #endif
@@ -475,6 +479,11 @@ int main(int argc, char *argv[]) {
         float tap_x = (touch.reportNum > 0) ? (touch.report[0].x * 960.0f / 1920.0f) : 0.0f;
         float tap_y = (touch.reportNum > 0) ? (touch.report[0].y * 544.0f / 1088.0f) : 0.0f;
         old_touch_count = touch.reportNum;
+
+        if (g_ignore_tap_frames > 0) {
+            g_ignore_tap_frames--;
+            tap_event = 0;
+        }
 
         /* Global SELECT button opens Home Welcome bubbles menu */
         if (btn_pressed & PSP2_CTRL_SELECT) {
@@ -548,15 +557,20 @@ int main(int argc, char *argv[]) {
                         g_search_type = (g_search_type == 1) ? 0 : 1;
                         if (g_search_query[0] != '\0') perform_search(g_search_query);
                     } else if (tap_x >= 824 && tap_x <= 880) {
+                        /* Search button tapped: execute search if query exists; else open keyboard */
+                        if (g_search_query[0] != '\0') {
+                            perform_search(g_search_query);
+                        } else {
 #ifdef __vita__
-                        open_keyboard("Search", g_search_query);
+                            open_keyboard("Search", g_search_query);
 #endif
+                        }
                     } else if (tap_x >= 886 && tap_x <= 940) {
                         g_is_search_mode = 0;
                         g_search_query[0] = '\0';
                         memcpy(&g_active_list, &g_trending_cache, sizeof(VideoList));
                         g_selected_index = 0;
-                    } else {
+                    } else if (tap_x >= 20 && tap_x <= 720) {
 #ifdef __vita__
                         open_keyboard("Search", g_search_query);
 #endif
