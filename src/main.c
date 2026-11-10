@@ -341,7 +341,7 @@ static void perform_search(const char *query) {
     }
     g_selected_index = 0;
     g_current_view = VIEW_TRENDING_LIST;
-    g_ignore_tap_frames = 20; /* Ignore touch clicks leftover from Submit button on IME keyboard */
+    g_ignore_tap_frames = 60; /* Extended tap cooldown (1 second) to swallow leftover Submit taps */
 }
 
 #ifdef __vita__
@@ -425,7 +425,12 @@ static void update_keyboard(void) {
 
         sceImeDialogTerm();
         g_ime_active = 0;
-        g_ignore_tap_frames = 20;
+        g_ignore_tap_frames = 60;
+
+        /* Flush touch state so clicks on IME Submit button are discarded */
+        SceTouchData t;
+        memset(&t, 0, sizeof(t));
+        sceTouchPeek(SCE_TOUCH_PORT_FRONT, &t, 1);
 
         if (search_buf[0] != '\0') {
             perform_search(search_buf);
