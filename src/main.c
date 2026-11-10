@@ -409,11 +409,11 @@ static void open_keyboard(const char *title, const char *initial_text) {
 static void update_keyboard(void) {
     if (!g_ime_active) return;
     SceCommonDialogStatus status = sceImeDialogGetStatus();
-    if (status == SCE_COMMON_DIALOG_STATUS_FINISHED || status == SCE_COMMON_DIALOG_STATUS_CANCELED) {
+    if (status == SCE_COMMON_DIALOG_STATUS_FINISHED) {
         SceImeDialogResult result;
         memset(&result, 0, sizeof(result));
         sceImeDialogGetResult(&result);
-        if (status == SCE_COMMON_DIALOG_STATUS_FINISHED && result.button == SCE_IME_DIALOG_BUTTON_ENTER) {
+        if (result.button == SCE_IME_DIALOG_BUTTON_ENTER) {
             char search_buf[128];
             utf16_to_utf8(s_ime_input_buf, search_buf, sizeof(search_buf));
             perform_search(search_buf);
