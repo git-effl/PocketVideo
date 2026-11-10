@@ -753,7 +753,7 @@ int main(int argc, char *argv[]) {
             ui_draw_status_bar("Instance Settings");
             ui_draw_text_centered(480.0f, 200.0f, COLOR_TEXT_LIGHT, 20, "Instance Configuration");
             ui_draw_text_centered(480.0f, 240.0f, COLOR_BRAND_CYAN, 15, "Current: https://yt.chocolatemoo53.com");
-            ui_draw_text_centered(480.0f, 280.0f, COLOR_TEXT_DIM, 14, "Fallback: https://api.piped.private.coffee");
+            ui_draw_text_centered(480.0f, 280.0f, COLOR_TEXT_DIM, 14, "Primary API: Invidious Direct Online Streaming");
             ui_draw_text_centered(480.0f, 440.0f, COLOR_HIGHLIGHT_AMBER, 14, "Press CIRCLE to return");
         }
 

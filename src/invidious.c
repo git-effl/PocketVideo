@@ -442,46 +442,19 @@ int invidious_search(const char *instance, const char *query, VideoList *out_lis
     snprintf(endpoint, sizeof(endpoint), "%s/api/v1/search?q=%s&type=video", base_url, encoded_q);
     int inv_count = fetch_invidious_array_endpoint(endpoint, out_list);
     if (inv_count > 0) {
-        inv_log("[Invidious] Search returned %d videos from primary instance.", inv_count);
+        inv_log("[Invidious Search] Loaded %d videos from %s.", inv_count, base_url);
         return inv_count;
     }
 
-    snprintf(endpoint, sizeof(endpoint), "%s/search?q=%s&filter=videos", PIPED_FALLBACK_HOST, encoded_q);
-    inv_log("[Search] Querying Piped fallback: %s", endpoint);
-
-    HttpResponse resp;
-    int net_status = http_get(endpoint, &resp);
-    if (net_status != 0 || !resp.data || resp.size == 0) {
-        http_response_free(&resp);
-        return (net_status != 0) ? net_status : -4;
+    /* Fallback search query on Invidious without type constraint */
+    snprintf(endpoint, sizeof(endpoint), "%s/api/v1/search?q=%s", base_url, encoded_q);
+    inv_count = fetch_invidious_array_endpoint(endpoint, out_list);
+    if (inv_count > 0) {
+        inv_log("[Invidious Search] Fallback returned %d videos.", inv_count);
+        return inv_count;
     }
 
-    cJSON *root = cJSON_Parse(resp.data);
-    http_response_free(&resp);
-    if (!root) return -5;
-
-    cJSON *items = cJSON_GetObjectItemCaseSensitive(root, "items");
-    if (!cJSON_IsArray(items)) {
-        cJSON_Delete(root);
-        return -6;
-    }
-
-    cJSON *item = NULL;
-    cJSON_ArrayForEach(item, items) {
-        if (out_list->count >= MAX_VIDEOS) break;
-        cJSON *type = cJSON_GetObjectItemCaseSensitive(item, "type");
-        if (type && cJSON_IsString(type) && strcmp(type->valuestring, "stream") != 0) {
-            continue;
-        }
-        VideoItem parsed;
-        parse_piped_stream_item(item, &parsed);
-        if (parsed.id[0] != '\0') {
-            out_list->items[out_list->count++] = parsed;
-        }
-    }
-
-    cJSON_Delete(root);
-    inv_log("[Search] Found %d videos.", out_list->count);
+    inv_log("[Invidious Search] No video results found for query: %s", query);
     return out_list->count;
 }
 
@@ -499,69 +472,11 @@ int invidious_search_channels(const char *instance, const char *query, VideoList
     snprintf(endpoint, sizeof(endpoint), "%s/api/v1/search?q=%s&type=channel", base_url, encoded_q);
     int inv_count = fetch_invidious_array_endpoint(endpoint, out_list);
     if (inv_count > 0) {
-        inv_log("[Invidious] Channel search returned %d channels.", inv_count);
+        inv_log("[Invidious Channel Search] Loaded %d channels from %s.", inv_count, base_url);
         return inv_count;
     }
 
-    snprintf(endpoint, sizeof(endpoint), "%s/search?q=%s&filter=channels", PIPED_FALLBACK_HOST, encoded_q);
-    inv_log("[Search] Querying Piped channel search fallback: %s", endpoint);
-
-    HttpResponse resp;
-    int net_status = http_get(endpoint, &resp);
-    if (net_status != 0 || !resp.data || resp.size == 0) {
-        http_response_free(&resp);
-        return (net_status != 0) ? net_status : -4;
-    }
-
-    cJSON *root = cJSON_Parse(resp.data);
-    http_response_free(&resp);
-    if (!root) return -5;
-
-    cJSON *items = cJSON_GetObjectItemCaseSensitive(root, "items");
-    if (cJSON_IsArray(items)) {
-        cJSON *item = NULL;
-        cJSON_ArrayForEach(item, items) {
-            if (out_list->count >= MAX_VIDEOS) break;
-            VideoItem ch;
-            memset(&ch, 0, sizeof(VideoItem));
-            ch.is_channel = 1;
-
-            cJSON *url = cJSON_GetObjectItemCaseSensitive(item, "url");
-            if (cJSON_IsString(url) && url->valuestring) {
-                const char *p = strstr(url->valuestring, "/channel/");
-                if (p) {
-                    snprintf(ch.id, sizeof(ch.id), "%s", p + 9);
-                    snprintf(ch.author_id, sizeof(ch.author_id), "%s", p + 9);
-                }
-            }
-
-            cJSON *name = cJSON_GetObjectItemCaseSensitive(item, "name");
-            if (cJSON_IsString(name) && name->valuestring) {
-                sanitize_utf8_text(name->valuestring, ch.title, sizeof(ch.title));
-                strncpy(ch.author, ch.title, sizeof(ch.author) - 1);
-                ch.author[sizeof(ch.author) - 1] = '\0';
-            }
-
-            cJSON *avatar = cJSON_GetObjectItemCaseSensitive(item, "thumbnail");
-            if (cJSON_IsString(avatar) && avatar->valuestring) {
-                snprintf(ch.thumbnail_url, sizeof(ch.thumbnail_url), "%s", avatar->valuestring);
-            }
-
-            cJSON *subs = cJSON_GetObjectItemCaseSensitive(item, "subscribers");
-            if (cJSON_IsNumber(subs)) ch.sub_count = (long long)subs->valuedouble;
-
-            cJSON *desc = cJSON_GetObjectItemCaseSensitive(item, "description");
-            if (cJSON_IsString(desc) && desc->valuestring) {
-                sanitize_utf8_text(desc->valuestring, ch.description, sizeof(ch.description));
-            }
-
-            if (ch.id[0] != '\0') {
-                out_list->items[out_list->count++] = ch;
-            }
-        }
-    }
-
-    cJSON_Delete(root);
+    inv_log("[Invidious Channel Search] No channels found for query: %s", query);
     return out_list->count;
 }
 
@@ -574,30 +489,76 @@ int invidious_fetch_video(const char *instance, const char *video_id, VideoItem 
     char endpoint[512];
 
     snprintf(endpoint, sizeof(endpoint), "%s/api/v1/videos/%s", base_url, video_id);
+    inv_log("[Invidious Direct Stream] Fetching stream metadata: %s", endpoint);
+
     HttpResponse resp;
     if (http_get(endpoint, &resp) == 0 && resp.data && resp.size > 0) {
         cJSON *root = cJSON_Parse(resp.data);
         http_response_free(&resp);
         if (root && cJSON_IsObject(root)) {
             parse_invidious_video_object(root, out_item);
+
             if (out_stream_url && max_stream_len > 0) {
+                /* 1. Extract formatStreams from Invidious (combined mp4 video+audio direct HTTPS streams) */
                 cJSON *fstreams = cJSON_GetObjectItemCaseSensitive(root, "formatStreams");
-                cJSON *fs = NULL;
-                cJSON_ArrayForEach(fs, fstreams) {
-                    cJSON *cont = cJSON_GetObjectItemCaseSensitive(fs, "container");
-                    cJSON *url = cJSON_GetObjectItemCaseSensitive(fs, "url");
-                    if (cJSON_IsString(cont) && strcmp(cont->valuestring, "mp4") == 0 &&
-                        cJSON_IsString(url) && url->valuestring) {
-                        snprintf(out_stream_url, max_stream_len, "%s", url->valuestring);
-                        cJSON *q = cJSON_GetObjectItemCaseSensitive(fs, "qualityLabel");
-                        if (cJSON_IsString(q) && strncmp(q->valuestring, "360p", 4) == 0) {
-                            break;
+                if (cJSON_IsArray(fstreams)) {
+                    cJSON *fs = NULL;
+                    cJSON_ArrayForEach(fs, fstreams) {
+                        cJSON *cont = cJSON_GetObjectItemCaseSensitive(fs, "container");
+                        cJSON *url = cJSON_GetObjectItemCaseSensitive(fs, "url");
+                        if (cJSON_IsString(url) && url->valuestring && url->valuestring[0] != '\0') {
+                            if (!cont || !cJSON_IsString(cont) || strcmp(cont->valuestring, "mp4") == 0) {
+                                if (strncmp(url->valuestring, "//", 2) == 0) {
+                                    snprintf(out_stream_url, max_stream_len, "https:%s", url->valuestring);
+                                } else if (strncmp(url->valuestring, "/", 1) == 0) {
+                                    snprintf(out_stream_url, max_stream_len, "%s%s", base_url, url->valuestring);
+                                } else {
+                                    snprintf(out_stream_url, max_stream_len, "%s", url->valuestring);
+                                }
+                                cJSON *q = cJSON_GetObjectItemCaseSensitive(fs, "qualityLabel");
+                                if (cJSON_IsString(q) && (strncmp(q->valuestring, "360p", 4) == 0 || strncmp(q->valuestring, "720p", 4) == 0)) {
+                                    break;
+                                }
+                            }
                         }
                     }
                 }
+
+                /* 2. Fallback to adaptiveFormats from Invidious if formatStreams is empty */
+                if (out_stream_url[0] == '\0') {
+                    cJSON *astreams = cJSON_GetObjectItemCaseSensitive(root, "adaptiveFormats");
+                    if (cJSON_IsArray(astreams)) {
+                        cJSON *as = NULL;
+                        cJSON_ArrayForEach(as, astreams) {
+                            cJSON *cont = cJSON_GetObjectItemCaseSensitive(as, "container");
+                            cJSON *type = cJSON_GetObjectItemCaseSensitive(as, "type");
+                            cJSON *url = cJSON_GetObjectItemCaseSensitive(as, "url");
+                            if (cJSON_IsString(url) && url->valuestring && url->valuestring[0] != '\0') {
+                                if ((cont && cJSON_IsString(cont) && strcmp(cont->valuestring, "mp4") == 0) ||
+                                    (type && cJSON_IsString(type) && strstr(type->valuestring, "mp4") != NULL)) {
+                                    if (strncmp(url->valuestring, "//", 2) == 0) {
+                                        snprintf(out_stream_url, max_stream_len, "https:%s", url->valuestring);
+                                    } else if (strncmp(url->valuestring, "/", 1) == 0) {
+                                        snprintf(out_stream_url, max_stream_len, "%s%s", base_url, url->valuestring);
+                                    } else {
+                                        snprintf(out_stream_url, max_stream_len, "%s", url->valuestring);
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                /* 3. Direct Invidious Proxy Stream URL (itag 18 / 22) */
+                if (out_stream_url[0] == '\0') {
+                    snprintf(out_stream_url, max_stream_len, "%s/latest_version?id=%s&itag=18", base_url, video_id);
+                }
             }
+
             cJSON_Delete(root);
             if (out_stream_url && out_stream_url[0] != '\0') {
+                inv_log("[Invidious Direct Stream] Direct HTTPS Stream URL: %s", out_stream_url);
                 return 0;
             }
         } else if (root) {
@@ -607,67 +568,7 @@ int invidious_fetch_video(const char *instance, const char *video_id, VideoItem 
         http_response_free(&resp);
     }
 
-    snprintf(endpoint, sizeof(endpoint), "%s/streams/%s", PIPED_FALLBACK_HOST, video_id);
-    inv_log("[Video] Fetching details & stream: %s", endpoint);
-    if (http_get(endpoint, &resp) == 0 && resp.data && resp.size > 0) {
-        cJSON *root = cJSON_Parse(resp.data);
-        http_response_free(&resp);
-        if (root && cJSON_IsObject(root)) {
-            cJSON *title = cJSON_GetObjectItemCaseSensitive(root, "title");
-            if (cJSON_IsString(title) && title->valuestring) {
-                sanitize_utf8_text(title->valuestring, out_item->title, sizeof(out_item->title));
-            }
-            cJSON *uploader = cJSON_GetObjectItemCaseSensitive(root, "uploader");
-            if (cJSON_IsString(uploader) && uploader->valuestring) {
-                sanitize_utf8_text(uploader->valuestring, out_item->author, sizeof(out_item->author));
-            }
-            cJSON *desc = cJSON_GetObjectItemCaseSensitive(root, "description");
-            if (cJSON_IsString(desc) && desc->valuestring && desc->valuestring[0] != '\0') {
-                sanitize_utf8_text(desc->valuestring, out_item->description, sizeof(out_item->description));
-            }
-            cJSON *dur = cJSON_GetObjectItemCaseSensitive(root, "duration");
-            if (cJSON_IsNumber(dur) && dur->valueint > 0) {
-                out_item->length_seconds = dur->valueint;
-            }
-            cJSON *views = cJSON_GetObjectItemCaseSensitive(root, "views");
-            if (cJSON_IsNumber(views) && views->valuedouble > 0) {
-                out_item->view_count = (long long)views->valuedouble;
-            }
-            cJSON *pub = cJSON_GetObjectItemCaseSensitive(root, "uploadDate");
-            if (cJSON_IsString(pub) && pub->valuestring && out_item->published_text[0] == '\0') {
-                strncpy(out_item->published_text, pub->valuestring, 10);
-                out_item->published_text[10] = '\0';
-            }
-            snprintf(out_item->thumbnail_url, sizeof(out_item->thumbnail_url),
-                     "https://i.ytimg.com/vi/%s/default.jpg", video_id);
-
-            if (out_stream_url && max_stream_len > 0) {
-                cJSON *vstreams = cJSON_GetObjectItemCaseSensitive(root, "videoStreams");
-                cJSON *vs = NULL;
-                cJSON_ArrayForEach(vs, vstreams) {
-                    cJSON *vonly = cJSON_GetObjectItemCaseSensitive(vs, "videoOnly");
-                    cJSON *fmt = cJSON_GetObjectItemCaseSensitive(vs, "format");
-                    cJSON *url = cJSON_GetObjectItemCaseSensitive(vs, "url");
-                    cJSON *qual = cJSON_GetObjectItemCaseSensitive(vs, "quality");
-                    if ((!vonly || !cJSON_IsTrue(vonly)) &&
-                        cJSON_IsString(fmt) && strcmp(fmt->valuestring, "MPEG_4") == 0 &&
-                        cJSON_IsString(url) && url->valuestring) {
-                        snprintf(out_stream_url, max_stream_len, "%s", url->valuestring);
-                        if (cJSON_IsString(qual) && strcmp(qual->valuestring, "360p") == 0) {
-                            break;
-                        }
-                    }
-                }
-            }
-            cJSON_Delete(root);
-            return 0;
-        } else if (root) {
-            cJSON_Delete(root);
-        }
-    } else {
-        http_response_free(&resp);
-    }
-
+    /* Fallback: Direct YouTube oEmbed metadata with Invidious direct proxy stream */
     snprintf(endpoint, sizeof(endpoint),
              "https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=%s&format=json",
              video_id);
@@ -686,6 +587,9 @@ int invidious_fetch_video(const char *instance, const char *video_id, VideoItem 
             }
             snprintf(out_item->thumbnail_url, sizeof(out_item->thumbnail_url),
                      "https://i.ytimg.com/vi/%s/default.jpg", video_id);
+            if (out_stream_url && max_stream_len > 0) {
+                snprintf(out_stream_url, max_stream_len, "%s/latest_version?id=%s&itag=18", base_url, video_id);
+            }
             cJSON_Delete(root);
             return 0;
         } else if (root) {
@@ -705,7 +609,7 @@ int invidious_fetch_channel_info(const char *instance, const char *channel_id, C
     const char *base_url = (instance && strlen(instance) > 0) ? instance : INVIDIOUS_DEFAULT_HOST;
     char endpoint[512];
     snprintf(endpoint, sizeof(endpoint), "%s/api/v1/channels/%s", base_url, channel_id);
-    inv_log("[Channel] Fetching channel metadata: %s", endpoint);
+    inv_log("[Invidious Channel] Fetching metadata: %s", endpoint);
 
     HttpResponse resp;
     if (http_get(endpoint, &resp) == 0 && resp.data && resp.size > 0) {
@@ -732,7 +636,13 @@ int invidious_fetch_channel_info(const char *instance, const char *channel_id, C
                 cJSON *b0 = cJSON_GetArrayItem(banners, cJSON_GetArraySize(banners) - 1);
                 cJSON *burl = cJSON_GetObjectItemCaseSensitive(b0, "url");
                 if (cJSON_IsString(burl) && burl->valuestring) {
-                    snprintf(out_info->banner_url, sizeof(out_info->banner_url), "%s", burl->valuestring);
+                    if (strncmp(burl->valuestring, "//", 2) == 0) {
+                        snprintf(out_info->banner_url, sizeof(out_info->banner_url), "https:%s", burl->valuestring);
+                    } else if (strncmp(burl->valuestring, "/", 1) == 0) {
+                        snprintf(out_info->banner_url, sizeof(out_info->banner_url), "%s%s", base_url, burl->valuestring);
+                    } else {
+                        snprintf(out_info->banner_url, sizeof(out_info->banner_url), "%s", burl->valuestring);
+                    }
                 }
             }
 
@@ -741,7 +651,13 @@ int invidious_fetch_channel_info(const char *instance, const char *channel_id, C
                 cJSON *t0 = cJSON_GetArrayItem(thumbs, cJSON_GetArraySize(thumbs) - 1);
                 cJSON *turl = cJSON_GetObjectItemCaseSensitive(t0, "url");
                 if (cJSON_IsString(turl) && turl->valuestring) {
-                    snprintf(out_info->avatar_url, sizeof(out_info->avatar_url), "%s", turl->valuestring);
+                    if (strncmp(turl->valuestring, "//", 2) == 0) {
+                        snprintf(out_info->avatar_url, sizeof(out_info->avatar_url), "https:%s", turl->valuestring);
+                    } else if (strncmp(turl->valuestring, "/", 1) == 0) {
+                        snprintf(out_info->avatar_url, sizeof(out_info->avatar_url), "%s%s", base_url, turl->valuestring);
+                    } else {
+                        snprintf(out_info->avatar_url, sizeof(out_info->avatar_url), "%s", turl->valuestring);
+                    }
                 }
             }
 
