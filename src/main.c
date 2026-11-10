@@ -495,13 +495,13 @@ int main(int argc, char *argv[]) {
                 else if (tap_x >= 400 && tap_x <= 560 && tap_y >= 210 && tap_y <= 370) g_bubble_selected = 1;
                 else if (tap_x >= 620 && tap_x <= 780 && tap_y >= 210 && tap_y <= 370) g_bubble_selected = 2;
             }
-            if ((btn_pressed & PSP2_CTRL_CROSS) || tap_event) {
-                if (g_bubble_selected == 0) {
+            if ((btn_pressed & PSP2_CTRL_CROSS) || (btn_pressed & PSP2_CTRL_TRIANGLE) || tap_event) {
+                if (g_bubble_selected == 0 && !(btn_pressed & PSP2_CTRL_TRIANGLE)) {
                     memcpy(&g_active_list, &g_trending_cache, sizeof(VideoList));
                     g_is_search_mode = 0;
                     g_selected_index = 0;
                     g_current_view = VIEW_TRENDING_LIST;
-                } else if (g_bubble_selected == 1) {
+                } else if (g_bubble_selected == 1 || (btn_pressed & PSP2_CTRL_TRIANGLE)) {
                     g_is_search_mode = 1;
                     g_current_view = VIEW_TRENDING_LIST;
 #ifdef __vita__
@@ -514,6 +514,13 @@ int main(int argc, char *argv[]) {
         }
         /* VIEW: TRENDING / SEARCH LIST */
         else if (g_current_view == VIEW_TRENDING_LIST) {
+            /* Open Search Keyboard: Triangle button (PSP2_CTRL_TRIANGLE) opens keyboard */
+            if (btn_pressed & PSP2_CTRL_TRIANGLE) {
+#ifdef __vita__
+                open_keyboard("Search YouTube or Channels", g_search_query);
+#endif
+            }
+
             /* Toggle Search Mode: Square button (PSP2_CTRL_SQUARE) toggles between Video and Channel search */
             if (btn_pressed & PSP2_CTRL_SQUARE) {
                 g_search_type = (g_search_type == 1) ? 0 : 1;

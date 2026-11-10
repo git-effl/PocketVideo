@@ -270,8 +270,8 @@ void ui_draw_search_bar(const char *query, int is_search_mode, int search_type) 
         ui_draw_text(54, 61, COLOR_TEXT_LIGHT, 15, display_q);
     } else {
         ui_draw_text(54, 61, COLOR_TEXT_DIM, 14,
-                     (search_type == 1) ? "Search Channels or enter Channel ID (Tap or press \xE2\x96\xA1 SQUARE)..."
-                                        : "Search YouTube or enter Video ID (Tap or press \xE2\x96\xA1 SQUARE)...");
+                     (search_type == 1) ? "Search Channels (Press \xE2\x96\xB2 TRIANGLE / \xE2\x96\xA1 SQUARE)..."
+                                        : "Search YouTube (Press \xE2\x96\xB2 TRIANGLE / \xE2\x96\xA1 SQUARE)...");
     }
 
     /* Mode button: Videos / Channels (x = 728..818) */
@@ -281,10 +281,10 @@ void ui_draw_search_bar(const char *query, int is_search_mode, int search_type) 
                     (search_type == 1) ? "Channels \xE2\x96\xA1" : "Videos \xE2\x96\xA1",
                     COLOR_TEXT_LIGHT, 12);
 
-    /* Search button (x = 824..880) */
+    /* Search button (x = 824..880) with Triangle symbol \xE2\x96\xB2 */
     draw_button_box(824.0f, 38.0f, 56.0f, 34.0f,
                     RGBA8(0, 150, 215, 235), COLOR_BRAND_CYAN,
-                    "Search", COLOR_TEXT_LIGHT, 12);
+                    "\xE2\x96\xB2 Search", COLOR_TEXT_LIGHT, 12);
 
     /* Reset button (x = 886..940) */
     if (is_search_mode) {
