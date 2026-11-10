@@ -305,6 +305,7 @@ static void open_channel_view(const char *channel_id) {
     render_loading_banner("Opening Channel...", "Fetching channel details & banner...");
 
     invidious_fetch_channel_info(INVIDIOUS_DEFAULT_HOST, channel_id, &g_current_channel);
+    ui_fetch_channel_assets(&g_current_channel);
     const char *tabs[] = {"Home", "Videos", "Shorts", "Live", "Playlists"};
     invidious_fetch_channel_videos(INVIDIOUS_DEFAULT_HOST, channel_id, tabs[g_channel_tab], &g_channel_videos);
 
@@ -341,7 +342,7 @@ static void perform_search(const char *query) {
     }
     g_selected_index = 0;
     g_current_view = VIEW_TRENDING_LIST;
-    g_ignore_tap_frames = 60; /* Extended tap cooldown (1 second) to swallow leftover Submit taps */
+    g_ignore_tap_frames = 10; /* Short tap cooldown (160ms) to swallow leftover Submit taps */
 }
 
 #ifdef __vita__
@@ -425,7 +426,7 @@ static void update_keyboard(void) {
 
         sceImeDialogTerm();
         g_ime_active = 0;
-        g_ignore_tap_frames = 60;
+        g_ignore_tap_frames = 10;
 
         /* Flush touch state so clicks on IME Submit button are discarded */
         SceTouchData t;
@@ -482,16 +483,49 @@ int main(int argc, char *argv[]) {
 
         uint32_t btn_pressed = pad.buttons & ~old_pad.buttons;
 
-        /* Analog stick thresholds for smooth navigation */
-        int stick_left  = (pad.lx < 60 && old_pad.lx >= 60);
-        int stick_right = (pad.lx > 195 && old_pad.lx <= 195);
-        int stick_up    = (pad.ly < 60 && old_pad.ly >= 60);
-        int stick_down  = (pad.ly > 195 && old_pad.ly <= 195);
+        /* DUAL ANALOG STICK ENGINE (Left & Right Analog Sticks with smooth repeat) */
+        static int s_stick_timer = 0;
 
+        int lx_L = (pad.lx < 80);
+        int lx_R = (pad.lx > 175);
+        int ly_U = (pad.ly < 80);
+        int ly_D = (pad.ly > 175);
+
+        int rx_L = (pad.rx < 80);
+        int rx_R = (pad.rx > 175);
+        int ry_U = (pad.ry < 80);
+        int ry_D = (pad.ry > 175);
+
+        int a_up    = (ly_U || ry_U);
+        int a_down  = (ly_D || ry_D);
+        int a_left  = (lx_L || rx_L);
+        int a_right = (lx_R || rx_R);
+
+        int stick_up    = 0;
+        int stick_down  = 0;
+        int stick_left  = 0;
+        int stick_right = 0;
+
+        if (a_up || a_down || a_left || a_right) {
+            if (s_stick_timer == 0 || s_stick_timer >= 12) {
+                if (a_up)    stick_up    = 1;
+                if (a_down)  stick_down  = 1;
+                if (a_left)  stick_left  = 1;
+                if (a_right) stick_right = 1;
+                if (s_stick_timer >= 12) s_stick_timer = 6;
+            }
+            s_stick_timer++;
+        } else {
+            s_stick_timer = 0;
+        }
+
+        /* TOUCH EVENT ENGINE (Supports both Vita3K & Physical PS Vita coordinate spaces) */
         sceTouchPeek(SCE_TOUCH_PORT_FRONT, &touch, 1);
         int tap_event = (touch.reportNum > 0 && old_touch_count == 0);
-        float tap_x = (touch.reportNum > 0) ? (touch.report[0].x * 960.0f / 1920.0f) : 0.0f;
-        float tap_y = (touch.reportNum > 0) ? (touch.report[0].y * 544.0f / 1088.0f) : 0.0f;
+        float raw_x = (touch.reportNum > 0) ? (float)touch.report[0].x : 0.0f;
+        float raw_y = (touch.reportNum > 0) ? (float)touch.report[0].y : 0.0f;
+        float tap_x = (raw_x > 960.0f) ? (raw_x * 960.0f / 1920.0f) : raw_x;
+        float tap_y = (raw_y > 544.0f) ? (raw_y * 544.0f / 1088.0f) : raw_y;
         old_touch_count = touch.reportNum;
 
         if (g_ignore_tap_frames > 0) {
@@ -569,12 +603,12 @@ int main(int argc, char *argv[]) {
 
             /* Tap search bar or mode buttons */
             if (tap_event) {
-                if (tap_y >= 38 && tap_y <= 72) {
-                    if (tap_x >= 728 && tap_x <= 818) {
+                if (tap_y >= 30 && tap_y <= 78) {
+                    if (tap_x >= 720 && tap_x <= 820) {
                         /* Toggle channel search mode button */
                         g_search_type = (g_search_type == 1) ? 0 : 1;
                         if (g_search_query[0] != '\0') perform_search(g_search_query);
-                    } else if (tap_x >= 824 && tap_x <= 880) {
+                    } else if (tap_x >= 822 && tap_x <= 882) {
                         /* Search button tapped: execute search if query exists; else open keyboard */
                         if (g_search_query[0] != '\0') {
                             perform_search(g_search_query);
@@ -583,12 +617,12 @@ int main(int argc, char *argv[]) {
                             open_keyboard("Search", g_search_query);
 #endif
                         }
-                    } else if (tap_x >= 886 && tap_x <= 940) {
+                    } else if (tap_x >= 884 && tap_x <= 950) {
                         g_is_search_mode = 0;
                         g_search_query[0] = '\0';
                         memcpy(&g_active_list, &g_trending_cache, sizeof(VideoList));
                         g_selected_index = 0;
-                    } else if (tap_x >= 20 && tap_x <= 720) {
+                    } else if (tap_x >= 20 && tap_x <= 718) {
 #ifdef __vita__
                         open_keyboard("Search", g_search_query);
 #endif
@@ -623,7 +657,7 @@ int main(int argc, char *argv[]) {
             if (g_channel_desc_modal) {
                 if ((btn_pressed & PSP2_CTRL_DOWN) || stick_down) g_channel_desc_scroll++;
                 if ((btn_pressed & PSP2_CTRL_UP) || stick_up) { if (g_channel_desc_scroll > 0) g_channel_desc_scroll--; }
-                if ((btn_pressed & PSP2_CTRL_CIRCLE) || (btn_pressed & PSP2_CTRL_SQUARE)) {
+                if ((btn_pressed & PSP2_CTRL_CIRCLE) || (btn_pressed & PSP2_CTRL_SQUARE) || tap_event) {
                     g_channel_desc_modal = 0;
                 }
             } else {
@@ -655,6 +689,27 @@ int main(int argc, char *argv[]) {
                 if ((btn_pressed & PSP2_CTRL_UP) || stick_up) {
                     if (g_channel_video_idx > 0) g_channel_video_idx--;
                 }
+                if (tap_event) {
+                    if (tap_y >= 110 && tap_y <= 152 && tap_x >= 770) {
+                        g_channel_desc_modal = 1;
+                        g_channel_desc_scroll = 0;
+                    } else if (tap_y >= 154 && tap_y <= 194) {
+                        int tab_tapped = (int)((tap_x - 20.0f) / 186.0f);
+                        if (tab_tapped >= 0 && tab_tapped < 5 && tab_tapped != g_channel_tab) {
+                            g_channel_tab = tab_tapped;
+                            const char *tabs[] = {"Home", "Videos", "Shorts", "Live", "Playlists"};
+                            render_loading_banner(g_current_channel.author, "Loading tab content...");
+                            invidious_fetch_channel_videos(INVIDIOUS_DEFAULT_HOST, g_current_channel.author_id, tabs[g_channel_tab], &g_channel_videos);
+                            g_channel_video_idx = 0;
+                        }
+                    } else if (tap_y >= 196 && tap_y <= 520) {
+                        int card_tapped = (int)((tap_y - 196) / 84);
+                        if (card_tapped >= 0 && card_tapped < 4 && card_tapped < g_channel_videos.count) {
+                            g_channel_video_idx = card_tapped;
+                            start_video_playback(&g_channel_videos.items[g_channel_video_idx]);
+                        }
+                    }
+                }
                 if ((btn_pressed & PSP2_CTRL_CROSS)) {
                     if (g_channel_videos.count > 0 && g_channel_video_idx < g_channel_videos.count) {
                         start_video_playback(&g_channel_videos.items[g_channel_video_idx]);
@@ -670,7 +725,7 @@ int main(int argc, char *argv[]) {
             if (g_player_desc_open) {
                 if ((btn_pressed & PSP2_CTRL_DOWN) || stick_down) g_player_desc_scroll++;
                 if ((btn_pressed & PSP2_CTRL_UP) || stick_up) { if (g_player_desc_scroll > 0) g_player_desc_scroll--; }
-                if ((btn_pressed & PSP2_CTRL_CIRCLE) || (btn_pressed & PSP2_CTRL_SQUARE)) {
+                if ((btn_pressed & PSP2_CTRL_CIRCLE) || (btn_pressed & PSP2_CTRL_SQUARE) || tap_event) {
                     g_player_desc_open = 0;
                 }
             } else {
@@ -678,7 +733,28 @@ int main(int argc, char *argv[]) {
                     g_player_desc_open = 1;
                     g_player_desc_scroll = 0;
                 }
-                if ((btn_pressed & PSP2_CTRL_CROSS) || tap_event) {
+                if (tap_event) {
+                    if (tap_y >= 490 && tap_x >= 240 && tap_x <= 344) {
+                        /* -10s seek back */
+                        if (g_player_cur_ms >= 10000ULL) g_player_cur_ms -= 10000ULL; else g_player_cur_ms = 0;
+                    } else if (tap_y >= 490 && tap_x >= 356 && tap_x <= 480) {
+                        /* Play / Pause toggle */
+                        g_player_paused = !g_player_paused;
+                    } else if (tap_y >= 490 && tap_x >= 492 && tap_x <= 596) {
+                        /* +10s seek forward */
+                        g_player_cur_ms += 10000ULL;
+                    } else if (tap_y >= 490 && tap_x >= 612 && tap_x <= 772) {
+                        /* Description modal */
+                        g_player_desc_open = 1;
+                        g_player_desc_scroll = 0;
+                    } else if (tap_y >= 490 && tap_x >= 784) {
+                        stop_video_playback();
+                        g_current_view = VIEW_TRENDING_LIST;
+                    } else {
+                        g_player_paused = !g_player_paused;
+                    }
+                }
+                if ((btn_pressed & PSP2_CTRL_CROSS)) {
                     g_player_paused = !g_player_paused;
                 }
                 if (btn_pressed & PSP2_CTRL_CIRCLE) {

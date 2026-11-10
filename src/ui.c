@@ -141,6 +141,39 @@ static int is_thumbnail_attempted(const char *key) {
     return 0;
 }
 
+static void ui_fetch_url_to_cache(const char *url) {
+    if (!url || url[0] == '\0') return;
+    if (is_thumbnail_attempted(url)) return;
+
+    ThumbCacheEntry *slot = &s_thumb_cache[s_thumb_next];
+    if (slot->tex) {
+        vita2d_free_texture(slot->tex);
+        slot->tex = NULL;
+    }
+    snprintf(slot->key, sizeof(slot->key), "%s", url);
+    slot->attempted = 1;
+    s_thumb_next = (s_thumb_next + 1) % THUMB_CACHE_SIZE;
+
+    HttpResponse resp;
+    if (http_get(url, &resp) == 0 && resp.data && resp.size > 0) {
+        slot->tex = vita2d_load_JPEG_buffer(resp.data, (unsigned long)resp.size);
+        if (!slot->tex) {
+            slot->tex = vita2d_load_PNG_buffer(resp.data);
+        }
+    }
+    http_response_free(&resp);
+}
+
+void ui_fetch_channel_assets(const ChannelInfo *channel) {
+    if (!channel) return;
+    if (channel->avatar_url[0] != '\0') {
+        ui_fetch_url_to_cache(channel->avatar_url);
+    }
+    if (channel->banner_url[0] != '\0') {
+        ui_fetch_url_to_cache(channel->banner_url);
+    }
+}
+
 void ui_fetch_one_visible_thumbnail(const VideoList *list, int offset, int visible_count) {
     if (!list || list->count <= 0) return;
 
@@ -150,23 +183,7 @@ void ui_fetch_one_visible_thumbnail(const VideoList *list, int offset, int visib
         if (key[0] == '\0') continue;
         if (is_thumbnail_attempted(key)) continue;
 
-        ThumbCacheEntry *slot = &s_thumb_cache[s_thumb_next];
-        if (slot->tex) {
-            vita2d_free_texture(slot->tex);
-            slot->tex = NULL;
-        }
-        snprintf(slot->key, sizeof(slot->key), "%s", key);
-        slot->attempted = 1;
-        s_thumb_next = (s_thumb_next + 1) % THUMB_CACHE_SIZE;
-
-        HttpResponse resp;
-        if (http_get(item->thumbnail_url, &resp) == 0 && resp.data && resp.size > 0) {
-            slot->tex = vita2d_load_JPEG_buffer(resp.data, (unsigned long)resp.size);
-            if (!slot->tex) {
-                slot->tex = vita2d_load_PNG_buffer(resp.data);
-            }
-        }
-        http_response_free(&resp);
+        ui_fetch_url_to_cache(key);
         return;
     }
 }
@@ -215,14 +232,12 @@ static uint32_t utf8_next_codepoint(const char **p) {
 }
 
 static vita2d_font* select_font_for_codepoint(uint32_t cp) {
-    /* 1. Emoji Ranges */
-    if ((cp >= 0x1F000 && cp <= 0x1FAF6) ||
+    /* 1. Emoji & High SMP Ranges: Skip unrenderable color bitmap emojis (prevent tofu boxes) */
+    if ((cp >= 0x1F000 && cp <= 0x1FAFF) ||
         (cp >= 0x1F300 && cp <= 0x1F6FF) ||
-        (cp >= 0x2600  && cp <= 0x27BF)  ||
-        (cp >= 0x2300  && cp <= 0x23FF)  ||
-        (cp >= 0x2B00  && cp <= 0x2BFF)  ||
-        (cp >= 0x1F100 && cp <= 0x1F1FF)) {
-        if (g_font_emoji) return g_font_emoji;
+        (cp >= 0x1F100 && cp <= 0x1F1FF) ||
+        (cp >= 0x1F900 && cp <= 0x1F9FF)) {
+        return NULL;
     }
 
     /* 2. Japanese & CJK Ranges */
@@ -236,10 +251,9 @@ static vita2d_font* select_font_for_codepoint(uint32_t cp) {
         if (g_font_jp) return g_font_jp;
     }
 
-    /* 3. Primary font for Latin, Cyrillic, Greek, Numbers & Symbols */
+    /* 3. Primary font for Latin, Cyrillic, Greek, Numbers & BMP Symbols */
     if (g_font_noto)  return g_font_noto;
     if (g_font_jp)    return g_font_jp;
-    if (g_font_emoji) return g_font_emoji;
 
     return NULL;
 }
@@ -248,7 +262,7 @@ void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const
     if (!text || text[0] == '\0') return;
 
     /* Fast path when only primary font is loaded */
-    if (!g_font_jp && !g_font_emoji) {
+    if (!g_font_jp) {
         if (g_font_noto) {
             vita2d_font_draw_text(g_font_noto, (int)x, (int)y, color, size, text);
         } else if (g_font_pvf_fallback) {
@@ -258,7 +272,7 @@ void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const
         return;
     }
 
-    /* Multi-font fallback rendering for mixed Latin, Cyrillic, Greek, Japanese & Emojis */
+    /* Multi-font fallback rendering for mixed Latin, Cyrillic, Greek, Japanese & Symbols */
     const char *p = text;
     float cur_x = x;
     char chunk[512];
@@ -269,6 +283,12 @@ void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const
         const char *prev_p = p;
         uint32_t cp = utf8_next_codepoint(&p);
         size_t bytes = (size_t)(p - prev_p);
+
+        /* Skip unrenderable high emoji codepoints to avoid drawing tofu boxes [ ] */
+        if (cp >= 0x1F000 && cp <= 0x1FAFF) {
+            continue;
+        }
+
         vita2d_font *target_font = select_font_for_codepoint(cp);
 
         if (cur_font == NULL) {
@@ -313,7 +333,7 @@ void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const
 int ui_get_text_width(unsigned int size, const char *text) {
     if (!text || text[0] == '\0') return 0;
 
-    if (!g_font_jp && !g_font_emoji) {
+    if (!g_font_jp) {
         if (g_font_noto) {
             return vita2d_font_text_width(g_font_noto, size, text);
         } else if (g_font_pvf_fallback) {
@@ -333,6 +353,12 @@ int ui_get_text_width(unsigned int size, const char *text) {
         const char *prev_p = p;
         uint32_t cp = utf8_next_codepoint(&p);
         size_t bytes = (size_t)(p - prev_p);
+
+        /* Skip unrenderable high emoji codepoints */
+        if (cp >= 0x1F000 && cp <= 0x1FAFF) {
+            continue;
+        }
+
         vita2d_font *target_font = select_font_for_codepoint(cp);
 
         if (cur_font == NULL) {
@@ -910,6 +936,9 @@ void ui_draw_channel_view(const ChannelInfo *channel, const VideoList *videos,
                           int selected_tab, int selected_video_idx, int desc_modal_open,
                           int desc_scroll) {
     vita2d_draw_rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, COLOR_BRAND_NAVY);
+    if (channel) {
+        ui_fetch_channel_assets(channel);
+    }
 
     /* Channel Banner Header (Y: 0..110) */
     vita2d_draw_rectangle(0, 0, SCREEN_WIDTH, 110, RGBA8(16, 28, 52, 255));

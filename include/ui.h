@@ -64,6 +64,7 @@ void ui_draw_search_bar(const char *query, int is_search_mode, int search_type);
 vita2d_texture *ui_get_cached_thumbnail(const char *video_id);
 vita2d_texture *ui_get_cached_banner(const char *url);
 void ui_fetch_one_visible_thumbnail(const VideoList *list, int offset, int visible_count);
+void ui_fetch_channel_assets(const ChannelInfo *channel);
 void ui_clear_thumbnails(void);
 
 /* Video card & Channel card rendering */

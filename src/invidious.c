@@ -638,6 +638,8 @@ int invidious_fetch_channel_info(const char *instance, const char *channel_id, C
                 if (cJSON_IsString(burl) && burl->valuestring) {
                     if (strncmp(burl->valuestring, "//", 2) == 0) {
                         snprintf(out_info->banner_url, sizeof(out_info->banner_url), "https:%s", burl->valuestring);
+                    } else if (strncmp(burl->valuestring, "http", 4) == 0) {
+                        snprintf(out_info->banner_url, sizeof(out_info->banner_url), "%s", burl->valuestring);
                     } else if (strncmp(burl->valuestring, "/", 1) == 0) {
                         snprintf(out_info->banner_url, sizeof(out_info->banner_url), "%s%s", base_url, burl->valuestring);
                     } else {
@@ -653,12 +655,17 @@ int invidious_fetch_channel_info(const char *instance, const char *channel_id, C
                 if (cJSON_IsString(turl) && turl->valuestring) {
                     if (strncmp(turl->valuestring, "//", 2) == 0) {
                         snprintf(out_info->avatar_url, sizeof(out_info->avatar_url), "https:%s", turl->valuestring);
+                    } else if (strncmp(turl->valuestring, "http", 4) == 0) {
+                        snprintf(out_info->avatar_url, sizeof(out_info->avatar_url), "%s", turl->valuestring);
                     } else if (strncmp(turl->valuestring, "/", 1) == 0) {
                         snprintf(out_info->avatar_url, sizeof(out_info->avatar_url), "%s%s", base_url, turl->valuestring);
                     } else {
                         snprintf(out_info->avatar_url, sizeof(out_info->avatar_url), "%s", turl->valuestring);
                     }
                 }
+            }
+            if (out_info->avatar_url[0] == '\0' && channel_id[0] != '\0') {
+                snprintf(out_info->avatar_url, sizeof(out_info->avatar_url), "https://i.ytimg.com/vi/%s/default.jpg", channel_id);
             }
 
             cJSON_Delete(root);
