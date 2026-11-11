@@ -492,7 +492,7 @@ void ui_draw_search_bar(const char *query, int is_search_mode, int search_type) 
     } else {
         ui_draw_text(54, 61, COLOR_TEXT_DIM, 14,
                      (search_type == 1) ? "Search Channels (Press \xCE\x94 TRIANGLE / [SQ] SQUARE)..."
-                                        : "Search YouTube (Press \xCE\x94 TRIANGLE / [SQ] SQUARE)...");
+                                        : "Search Invidious (Press \xCE\x94 TRIANGLE / [SQ] SQUARE)...");
     }
 
     /* Mode button: Videos / Channels (x = 728..818) */
@@ -765,31 +765,27 @@ void ui_draw_player_screen(const VideoItem *item, vita2d_texture *video_tex,
                  is_paused ? "  [PAUSED]" : "");
         ui_draw_text(24, 486, RGBA8(245, 245, 248, a), 14, time_label);
 
-        draw_button_box(240.0f, 492.0f, 104.0f, 38.0f,
+        draw_button_box(160.0f, 492.0f, 104.0f, 38.0f,
                         RGBA8(22, 42, 74, bar_a), RGBA8(75, 115, 175, a),
                         "<< -10s (L)", RGBA8(245, 245, 248, a), 13);
 
-        draw_button_box(356.0f, 492.0f, 124.0f, 38.0f,
+        draw_button_box(276.0f, 492.0f, 120.0f, 38.0f,
                         RGBA8(0, 125, 195, bar_a), RGBA8(0, 174, 239, a),
                         is_paused ? "Play (X)" : "Pause (X)", RGBA8(245, 245, 248, a), 14);
 
-        draw_button_box(492.0f, 492.0f, 104.0f, 38.0f,
+        draw_button_box(408.0f, 492.0f, 104.0f, 38.0f,
                         RGBA8(22, 42, 74, bar_a), RGBA8(75, 115, 175, a),
                         "+10s (R) >>", RGBA8(245, 245, 248, a), 13);
 
-        draw_button_box(612.0f, 492.0f, 160.0f, 38.0f,
+        draw_button_box(524.0f, 492.0f, 140.0f, 38.0f,
                         RGBA8(205, 45, 120, bar_a), RGBA8(255, 120, 190, a),
                         "Description [SQ]", RGBA8(245, 245, 248, a), 13);
 
-        float sq_x = 620.0f;
-        float sq_y = 504.0f;
-        float sq_s = 13.0f;
-        vita2d_draw_line(sq_x, sq_y, sq_x + sq_s, sq_y, RGBA8(255, 255, 255, a));
-        vita2d_draw_line(sq_x + sq_s, sq_y, sq_x + sq_s, sq_y + sq_s, RGBA8(255, 255, 255, a));
-        vita2d_draw_line(sq_x, sq_y + sq_s, sq_x + sq_s, sq_y + sq_s, RGBA8(255, 255, 255, a));
-        vita2d_draw_line(sq_x, sq_y, sq_x, sq_y + sq_s, RGBA8(255, 255, 255, a));
+        draw_button_box(676.0f, 492.0f, 130.0f, 38.0f,
+                        RGBA8(0, 140, 190, bar_a), RGBA8(0, 185, 245, a),
+                        "Comments [\xCE\x94]", RGBA8(245, 245, 248, a), 13);
 
-        draw_button_box(784.0f, 492.0f, 152.0f, 38.0f,
+        draw_button_box(818.0f, 492.0f, 118.0f, 38.0f,
                         RGBA8(30, 44, 68, bar_a), RGBA8(120, 145, 185, a),
                         "Back (O)", RGBA8(245, 245, 248, a), 13);
     }
@@ -873,6 +869,71 @@ void ui_draw_description_modal(const VideoItem *item, int scroll_line) {
     draw_button_box(mx + mw - 180.0f, my + mh - 44.0f, 156.0f, 32.0f,
                     RGBA8(0, 130, 195, 235), COLOR_BRAND_CYAN,
                     "Close (Circle / [SQ])", COLOR_TEXT_LIGHT, 12);
+}
+
+void ui_draw_comments_modal(const CommentList *comments, int scroll_line) {
+    vita2d_draw_rectangle(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT, RGBA8(0, 0, 0, 185));
+
+    float mx = 80.0f;
+    float my = 40.0f;
+    float mw = 800.0f;
+    float mh = 464.0f;
+
+    vita2d_draw_rectangle(mx + 6, my + 8, mw, mh, RGBA8(0, 0, 0, 140));
+    vita2d_draw_rectangle(mx, my, mw, mh, RGBA8(12, 20, 36, 248));
+
+    vita2d_draw_rectangle(mx, my, mw, 3, COLOR_BRAND_CYAN);
+    vita2d_draw_line(mx, my, mx, my + mh, RGBA8(40, 65, 105, 255));
+    vita2d_draw_line(mx + mw, my, mx + mw, my + mh, RGBA8(40, 65, 105, 255));
+    vita2d_draw_line(mx, my + mh, mx + mw, my + mh, RGBA8(40, 65, 105, 255));
+
+    ui_draw_text(mx + 24, my + 32, COLOR_BRAND_CYAN, 20, "Video Comments (\xCE\x94 TRIANGLE)");
+    vita2d_draw_line(mx + 24, my + 44, mx + mw - 24, my + 44, RGBA8(30, 50, 80, 255));
+
+    if (!comments || comments->count <= 0) {
+        ui_draw_text_centered(mx + (mw * 0.5f), my + 200.0f, COLOR_TEXT_DIM, 16,
+                              "No comments loaded or comments disabled.");
+    } else {
+        int visible = 4;
+        if (scroll_line < 0) scroll_line = 0;
+        if (scroll_line > comments->count - visible) scroll_line = comments->count - visible;
+        if (scroll_line < 0) scroll_line = 0;
+
+        for (int i = 0; i < visible && (scroll_line + i) < comments->count; i++) {
+            int idx = scroll_line + i;
+            const CommentItem *c = &comments->items[idx];
+            float cy = my + 54.0f + (i * 92.0f);
+
+            vita2d_draw_rectangle(mx + 24, cy, mw - 48, 84, RGBA8(6, 12, 22, 240));
+            vita2d_draw_line(mx + 24, cy, mx + mw - 24, cy, RGBA8(35, 55, 85, 180));
+
+            /* Author & Time */
+            char header[256];
+            if (c->published_text[0] != '\0') {
+                snprintf(header, sizeof(header), "%s  *  %s  *  Likes: %ld",
+                         c->author[0] ? c->author : "User", c->published_text, c->like_count);
+            } else {
+                snprintf(header, sizeof(header), "%s  *  Likes: %ld",
+                         c->author[0] ? c->author : "User", c->like_count);
+            }
+            ui_draw_text(mx + 36, cy + 22, COLOR_HIGHLIGHT_AMBER, 14, header);
+
+            /* Comment Content Snippet */
+            char content_snip[180];
+            size_t clen = strlen(c->content);
+            if (clen <= 110) {
+                snprintf(content_snip, sizeof(content_snip), "%s", c->content);
+            } else {
+                memcpy(content_snip, c->content, 106);
+                memcpy(content_snip + 106, "...", 4);
+            }
+            ui_draw_text(mx + 36, cy + 50, COLOR_TEXT_LIGHT, 13, content_snip);
+        }
+    }
+
+    draw_button_box(mx + mw - 190.0f, my + mh - 42.0f, 166.0f, 32.0f,
+                    RGBA8(0, 130, 195, 235), COLOR_BRAND_CYAN,
+                    "Close (Circle / \xCE\x94)", COLOR_TEXT_LIGHT, 12);
 }
 
 void ui_draw_channel_description_modal(const ChannelInfo *channel, int scroll_line) {

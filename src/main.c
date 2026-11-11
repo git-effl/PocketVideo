@@ -102,6 +102,10 @@ static int g_player_hud_timer = 240;
 static int g_player_paused = 0;
 static int g_player_desc_open = 0;
 static int g_player_desc_scroll = 0;
+static int g_player_comments_open = 0;
+static int g_player_comments_scroll = 0;
+static CommentList g_player_comments;
+static int g_player_comments_loaded = 0;
 static uint64_t g_player_cur_ms = 0;
 static uint64_t g_player_total_ms = 0;
 static char g_player_status[160] = "";
@@ -229,6 +233,10 @@ static void stop_video_playback(void) {
     g_player_paused = 0;
     g_player_desc_open = 0;
     g_player_desc_scroll = 0;
+    g_player_comments_open = 0;
+    g_player_comments_scroll = 0;
+    g_player_comments_loaded = 0;
+    memset(&g_player_comments, 0, sizeof(CommentList));
     g_player_cur_ms = 0;
     g_player_total_ms = 0;
     g_player_status[0] = '\0';
@@ -255,6 +263,10 @@ static void start_video_playback(const VideoItem *item) {
     g_player_paused = 0;
     g_player_desc_open = 0;
     g_player_desc_scroll = 0;
+    g_player_comments_open = 0;
+    g_player_comments_scroll = 0;
+    g_player_comments_loaded = 0;
+    memset(&g_player_comments, 0, sizeof(CommentList));
     g_player_hud_alpha = 1.0f;
     g_player_hud_timer = 240;
 
@@ -722,32 +734,56 @@ int main(int argc, char *argv[]) {
         }
         /* VIEW: VIDEO PLAYER */
         else if (g_current_view == VIEW_PLAYER) {
-            if (g_player_desc_open) {
+            if (g_player_comments_open) {
+                if ((btn_pressed & PSP2_CTRL_DOWN) || stick_down) g_player_comments_scroll++;
+                if ((btn_pressed & PSP2_CTRL_UP) || stick_up) { if (g_player_comments_scroll > 0) g_player_comments_scroll--; }
+                if ((btn_pressed & PSP2_CTRL_CIRCLE) || (btn_pressed & PSP2_CTRL_TRIANGLE) || (btn_pressed & PSP2_CTRL_SQUARE) || tap_event) {
+                    g_player_comments_open = 0;
+                }
+            } else if (g_player_desc_open) {
                 if ((btn_pressed & PSP2_CTRL_DOWN) || stick_down) g_player_desc_scroll++;
                 if ((btn_pressed & PSP2_CTRL_UP) || stick_up) { if (g_player_desc_scroll > 0) g_player_desc_scroll--; }
                 if ((btn_pressed & PSP2_CTRL_CIRCLE) || (btn_pressed & PSP2_CTRL_SQUARE) || tap_event) {
                     g_player_desc_open = 0;
                 }
             } else {
+                if (btn_pressed & PSP2_CTRL_TRIANGLE) {
+                    g_player_comments_open = 1;
+                    g_player_comments_scroll = 0;
+                    if (!g_player_comments_loaded && g_playing_item.id[0] != '\0') {
+                        render_loading_banner("Loading Comments...", "Fetching video comments from Invidious...");
+                        invidious_fetch_comments(INVIDIOUS_DEFAULT_HOST, g_playing_item.id, &g_player_comments);
+                        g_player_comments_loaded = 1;
+                    }
+                }
                 if (btn_pressed & PSP2_CTRL_SQUARE) {
                     g_player_desc_open = 1;
                     g_player_desc_scroll = 0;
                 }
                 if (tap_event) {
-                    if (tap_y >= 490 && tap_x >= 240 && tap_x <= 344) {
+                    if (tap_y >= 480 && tap_x >= 150 && tap_x <= 266) {
                         /* -10s seek back */
                         if (g_player_cur_ms >= 10000ULL) g_player_cur_ms -= 10000ULL; else g_player_cur_ms = 0;
-                    } else if (tap_y >= 490 && tap_x >= 356 && tap_x <= 480) {
+                    } else if (tap_y >= 480 && tap_x >= 270 && tap_x <= 398) {
                         /* Play / Pause toggle */
                         g_player_paused = !g_player_paused;
-                    } else if (tap_y >= 490 && tap_x >= 492 && tap_x <= 596) {
+                    } else if (tap_y >= 480 && tap_x >= 402 && tap_x <= 514) {
                         /* +10s seek forward */
                         g_player_cur_ms += 10000ULL;
-                    } else if (tap_y >= 490 && tap_x >= 612 && tap_x <= 772) {
+                    } else if (tap_y >= 480 && tap_x >= 518 && tap_x <= 664) {
                         /* Description modal */
                         g_player_desc_open = 1;
                         g_player_desc_scroll = 0;
-                    } else if (tap_y >= 490 && tap_x >= 784) {
+                    } else if (tap_y >= 480 && tap_x >= 668 && tap_x <= 810) {
+                        /* Comments modal */
+                        g_player_comments_open = 1;
+                        g_player_comments_scroll = 0;
+                        if (!g_player_comments_loaded && g_playing_item.id[0] != '\0') {
+                            render_loading_banner("Loading Comments...", "Fetching video comments from Invidious...");
+                            invidious_fetch_comments(INVIDIOUS_DEFAULT_HOST, g_playing_item.id, &g_player_comments);
+                            g_player_comments_loaded = 1;
+                        }
+                    } else if (tap_y >= 480 && tap_x >= 812) {
                         stop_video_playback();
                         g_current_view = VIEW_TRENDING_LIST;
                     } else {
@@ -823,6 +859,9 @@ int main(int argc, char *argv[]) {
                                    g_player_cur_ms, g_player_total_ms,
                                    g_player_desc_open, g_player_desc_scroll,
                                    g_player_status);
+            if (g_player_comments_open) {
+                ui_draw_comments_modal(&g_player_comments, g_player_comments_scroll);
+            }
         }
         else if (g_current_view == VIEW_SETTINGS) {
             ui_draw_background();

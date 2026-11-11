@@ -704,3 +704,71 @@ int invidious_fetch_channel_videos(const char *instance, const char *channel_id,
     cJSON_Delete(root);
     return out_list->count;
 }
+
+int invidious_fetch_comments(const char *instance, const char *video_id, CommentList *out_comments) {
+    if (!video_id || !out_comments) return -1;
+    memset(out_comments, 0, sizeof(CommentList));
+
+    const char *base_url = (instance && strlen(instance) > 0) ? instance : INVIDIOUS_DEFAULT_HOST;
+    char endpoint[512];
+    snprintf(endpoint, sizeof(endpoint), "%s/api/v1/comments/%s", base_url, video_id);
+    inv_log("[Invidious] Fetching comments: %s", endpoint);
+
+    HttpResponse resp;
+    if (http_get(endpoint, &resp) != 0 || !resp.data) {
+        http_response_free(&resp);
+        return -1;
+    }
+
+    cJSON *root = cJSON_Parse(resp.data);
+    http_response_free(&resp);
+    if (!root) return -1;
+
+    cJSON *comments_arr = root;
+    if (cJSON_IsObject(root)) {
+        comments_arr = cJSON_GetObjectItemCaseSensitive(root, "comments");
+    }
+
+    if (comments_arr && cJSON_IsArray(comments_arr)) {
+        cJSON *item = NULL;
+        cJSON_ArrayForEach(item, comments_arr) {
+            if (out_comments->count >= 32) break;
+            CommentItem *c = &out_comments->items[out_comments->count];
+
+            cJSON *author = cJSON_GetObjectItemCaseSensitive(item, "author");
+            if (cJSON_IsString(author) && author->valuestring) {
+                sanitize_utf8_text(author->valuestring, c->author, sizeof(c->author));
+            }
+
+            cJSON *author_id = cJSON_GetObjectItemCaseSensitive(item, "authorId");
+            if (cJSON_IsString(author_id) && author_id->valuestring) {
+                snprintf(c->author_id, sizeof(c->author_id), "%s", author_id->valuestring);
+            }
+
+            cJSON *pub = cJSON_GetObjectItemCaseSensitive(item, "publishedText");
+            if (cJSON_IsString(pub) && pub->valuestring) {
+                sanitize_utf8_text(pub->valuestring, c->published_text, sizeof(c->published_text));
+            }
+
+            cJSON *likes = cJSON_GetObjectItemCaseSensitive(item, "likeCount");
+            if (cJSON_IsNumber(likes)) {
+                c->like_count = (long)likes->valuedouble;
+            }
+
+            cJSON *content = cJSON_GetObjectItemCaseSensitive(item, "content");
+            cJSON *contentHtml = cJSON_GetObjectItemCaseSensitive(item, "contentHtml");
+            if (cJSON_IsString(content) && content->valuestring) {
+                sanitize_utf8_text(content->valuestring, c->content, sizeof(c->content));
+            } else if (cJSON_IsString(contentHtml) && contentHtml->valuestring) {
+                sanitize_utf8_text(contentHtml->valuestring, c->content, sizeof(c->content));
+            }
+
+            if (c->author[0] != '\0' || c->content[0] != '\0') {
+                out_comments->count++;
+            }
+        }
+    }
+
+    cJSON_Delete(root);
+    return out_comments->count;
+}

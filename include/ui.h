@@ -77,6 +77,7 @@ void ui_draw_player_screen(const VideoItem *item, vita2d_texture *video_tex,
                            int desc_open, int desc_scroll, const char *player_status);
 
 void ui_draw_description_modal(const VideoItem *item, int scroll_line);
+void ui_draw_comments_modal(const CommentList *comments, int scroll_line);
 
 /* Channel Menu View with banner, icon, description, category tabs & video list */
 void ui_draw_channel_view(const ChannelInfo *channel, const VideoList *videos,

@@ -45,6 +45,20 @@ typedef struct {
     char instance[128];
 } VideoList;
 
+typedef struct {
+    char author[128];
+    char author_id[64];
+    char author_avatar[256];
+    char published_text[64];
+    long like_count;
+    char content[512];
+} CommentItem;
+
+typedef struct {
+    int count;
+    CommentItem items[32];
+} CommentList;
+
 int invidious_fetch_trending(const char *instance, VideoList *out_list);
 int invidious_search(const char *instance, const char *query, VideoList *out_list);
 int invidious_search_channels(const char *instance, const char *query, VideoList *out_list);
@@ -52,6 +66,7 @@ int invidious_fetch_video(const char *instance, const char *video_id, VideoItem 
                           char *out_stream_url, size_t max_stream_len);
 int invidious_fetch_channel_info(const char *instance, const char *channel_id, ChannelInfo *out_info);
 int invidious_fetch_channel_videos(const char *instance, const char *channel_id, const char *tab, VideoList *out_list);
+int invidious_fetch_comments(const char *instance, const char *video_id, CommentList *out_comments);
 int invidious_extract_video_id(const char *input, char *out_id, size_t max_len);
 void sanitize_utf8_text(const char *src, char *dst, size_t max_len);
 void format_duration(int seconds, char *buffer, size_t max_len);
