@@ -24,6 +24,9 @@
   #include "cJSON.h"
 #endif
 
+/* Forward declaration for internal array fetch helper */
+static int fetch_invidious_array_endpoint(const char *endpoint, VideoList *out_list);
+
 void format_duration(int seconds, char *buffer, size_t max_len) {
     if (!buffer || max_len == 0) return;
     if (seconds <= 0) {
@@ -313,7 +316,7 @@ int invidious_fetch_trending(const char *instance, VideoList *out_list) {
     char endpoint[512];
     /* 1. Primary: Invidious /api/v1/trending */
     snprintf(endpoint, sizeof(endpoint), "%s/api/v1/trending", base_url);
-    int r1 = fetch_invidious_array_endpoint(endpoint, out_list);
+    fetch_invidious_array_endpoint(endpoint, out_list);
 
     /* 2. Secondary fallback: /api/v1/popular if trending is empty */
     if (out_list->count == 0) {
@@ -321,10 +324,10 @@ int invidious_fetch_trending(const char *instance, VideoList *out_list) {
         fetch_invidious_array_endpoint(endpoint, out_list);
     }
 
-    /* 3. Tertiary fallback: Piped trending feed if Invidious endpoints return empty */
+    /* 3. Tertiary fallback: Invidious standard /api/v1/search?q= */
     if (out_list->count == 0) {
-        snprintf(endpoint, sizeof(endpoint), "%s/trending?region=US", PIPED_FALLBACK_HOST);
-        fetch_piped_array_endpoint(endpoint, out_list);
+        snprintf(endpoint, sizeof(endpoint), "%s/api/v1/search?q=music", base_url);
+        fetch_invidious_array_endpoint(endpoint, out_list);
     }
 
     inv_log("[Invidious] Loaded %d trending/popular videos.", out_list->count);
@@ -350,64 +353,6 @@ static void url_encode_query(const char *src, char *dst, size_t max_len) {
         }
     }
     dst[pos] = '\0';
-}
-
-static void parse_piped_stream_item(cJSON *item, VideoItem *v) {
-    memset(v, 0, sizeof(VideoItem));
-
-    cJSON *url = cJSON_GetObjectItemCaseSensitive(item, "url");
-    if (cJSON_IsString(url) && url->valuestring) {
-        invidious_extract_video_id(url->valuestring, v->id, sizeof(v->id));
-    }
-
-    cJSON *title = cJSON_GetObjectItemCaseSensitive(item, "title");
-    if (cJSON_IsString(title) && title->valuestring) {
-        sanitize_utf8_text(title->valuestring, v->title, sizeof(v->title));
-    }
-    if (v->title[0] == '\0') {
-        snprintf(v->title, sizeof(v->title), "Untitled Video");
-    }
-
-    cJSON *uploader = cJSON_GetObjectItemCaseSensitive(item, "uploaderName");
-    if (cJSON_IsString(uploader) && uploader->valuestring) {
-        sanitize_utf8_text(uploader->valuestring, v->author, sizeof(v->author));
-    }
-
-    cJSON *uploader_url = cJSON_GetObjectItemCaseSensitive(item, "uploaderUrl");
-    if (cJSON_IsString(uploader_url) && uploader_url->valuestring) {
-        snprintf(v->author_url, sizeof(v->author_url), "%s", uploader_url->valuestring);
-        const char *ch = strstr(uploader_url->valuestring, "/channel/");
-        if (ch) {
-            snprintf(v->author_id, sizeof(v->author_id), "%s", ch + 9);
-        }
-    }
-
-    cJSON *desc = cJSON_GetObjectItemCaseSensitive(item, "shortDescription");
-    if (cJSON_IsString(desc) && desc->valuestring && desc->valuestring[0] != '\0') {
-        sanitize_utf8_text(desc->valuestring, v->description, sizeof(v->description));
-    } else {
-        snprintf(v->description, sizeof(v->description), "Select Description during playback to view full notes.");
-    }
-
-    cJSON *dur = cJSON_GetObjectItemCaseSensitive(item, "duration");
-    if (cJSON_IsNumber(dur)) {
-        v->length_seconds = dur->valueint;
-    }
-
-    cJSON *views = cJSON_GetObjectItemCaseSensitive(item, "views");
-    if (cJSON_IsNumber(views)) {
-        v->view_count = (long long)views->valuedouble;
-    }
-
-    cJSON *pub = cJSON_GetObjectItemCaseSensitive(item, "uploadedDate");
-    if (cJSON_IsString(pub) && pub->valuestring) {
-        snprintf(v->published_text, sizeof(v->published_text), "%s", pub->valuestring);
-    }
-
-    if (v->id[0] != '\0') {
-        snprintf(v->thumbnail_url, sizeof(v->thumbnail_url),
-                 "https://i.ytimg.com/vi/%s/default.jpg", v->id);
-    }
 }
 
 int invidious_search(const char *instance, const char *query, VideoList *out_list) {
@@ -481,7 +426,7 @@ int invidious_fetch_video(const char *instance, const char *video_id, VideoItem 
             parse_invidious_video_object(root, out_item);
 
             if (out_stream_url && max_stream_len > 0) {
-                /* 1. Extract formatStreams from Invidious (combined mp4 video+audio direct HTTPS streams) */
+                /* 1. Extract formatStreams from Invidious */
                 cJSON *fstreams = cJSON_GetObjectItemCaseSensitive(root, "formatStreams");
                 if (cJSON_IsArray(fstreams)) {
                     cJSON *fs = NULL;
@@ -506,7 +451,7 @@ int invidious_fetch_video(const char *instance, const char *video_id, VideoItem 
                     }
                 }
 
-                /* 2. Fallback to adaptiveFormats from Invidious if formatStreams is empty */
+                /* 2. Fallback to adaptiveFormats */
                 if (out_stream_url[0] == '\0') {
                     cJSON *astreams = cJSON_GetObjectItemCaseSensitive(root, "adaptiveFormats");
                     if (cJSON_IsArray(astreams)) {
@@ -532,7 +477,7 @@ int invidious_fetch_video(const char *instance, const char *video_id, VideoItem 
                     }
                 }
 
-                /* 3. Direct Invidious Proxy Stream URL (itag 18 / 22) */
+                /* 3. Direct Invidious Proxy Stream URL (itag 18) */
                 if (out_stream_url[0] == '\0') {
                     snprintf(out_stream_url, max_stream_len, "%s/latest_version?id=%s&itag=18", base_url, video_id);
                 }
@@ -550,7 +495,7 @@ int invidious_fetch_video(const char *instance, const char *video_id, VideoItem 
         http_response_free(&resp);
     }
 
-    /* Fallback: Direct YouTube oEmbed metadata with Invidious direct proxy stream */
+    /* Fallback: Direct YouTube oEmbed metadata */
     snprintf(endpoint, sizeof(endpoint),
              "https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=%s&format=json",
              video_id);
@@ -769,10 +714,7 @@ int invidious_fetch_comments(const char *instance, const char *video_id, Comment
             } else if (cJSON_IsString(contentHtml) && contentHtml->valuestring) {
                 sanitize_utf8_text(contentHtml->valuestring, c->content, sizeof(c->content));
             }
-
-            if (c->author[0] != '\0' || c->content[0] != '\0') {
-                out_comments->count++;
-            }
+            out_comments->count++;
         }
     }
 
