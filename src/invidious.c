@@ -314,13 +314,13 @@ int invidious_fetch_trending(const char *instance, VideoList *out_list) {
     snprintf(out_list->instance, sizeof(out_list->instance), "%s", base_url);
 
     char endpoint[512];
-    /* 1. Primary: Invidious /api/v1/trending */
-    snprintf(endpoint, sizeof(endpoint), "%s/api/v1/trending", base_url);
+    /* 1. Primary: Invidious /api/v1/popular (Main page popular feed) */
+    snprintf(endpoint, sizeof(endpoint), "%s/api/v1/popular", base_url);
     fetch_invidious_array_endpoint(endpoint, out_list);
 
-    /* 2. Secondary fallback: /api/v1/popular if trending is empty */
+    /* 2. Secondary fallback: /api/v1/trending if popular is empty */
     if (out_list->count == 0) {
-        snprintf(endpoint, sizeof(endpoint), "%s/api/v1/popular", base_url);
+        snprintf(endpoint, sizeof(endpoint), "%s/api/v1/trending", base_url);
         fetch_invidious_array_endpoint(endpoint, out_list);
     }
 
@@ -330,7 +330,7 @@ int invidious_fetch_trending(const char *instance, VideoList *out_list) {
         fetch_invidious_array_endpoint(endpoint, out_list);
     }
 
-    inv_log("[Invidious] Loaded %d trending/popular videos.", out_list->count);
+    inv_log("[Invidious] Loaded %d popular/trending videos.", out_list->count);
     return out_list->count;
 }
 
@@ -495,29 +495,20 @@ int invidious_fetch_video(const char *instance, const char *video_id, VideoItem 
         http_response_free(&resp);
     }
 
-    /* Fallback: Direct YouTube oEmbed metadata */
-    snprintf(endpoint, sizeof(endpoint),
-             "https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=%s&format=json",
-             video_id);
+    /* Fallback: Direct Invidious instance proxy search metadata */
+    snprintf(endpoint, sizeof(endpoint), "%s/api/v1/search?q=%s", base_url, video_id);
     if (http_get(endpoint, &resp) == 0 && resp.data && resp.size > 0) {
         cJSON *root = cJSON_Parse(resp.data);
         http_response_free(&resp);
-        if (root && cJSON_IsObject(root)) {
-            snprintf(out_item->id, sizeof(out_item->id), "%s", video_id);
-            cJSON *title = cJSON_GetObjectItemCaseSensitive(root, "title");
-            if (cJSON_IsString(title) && title->valuestring) {
-                sanitize_utf8_text(title->valuestring, out_item->title, sizeof(out_item->title));
+        if (root && cJSON_IsArray(root) && cJSON_GetArraySize(root) > 0) {
+            cJSON *first = cJSON_GetArrayItem(root, 0);
+            if (first) {
+                parse_invidious_video_object(first, out_item);
             }
-            cJSON *author = cJSON_GetObjectItemCaseSensitive(root, "author_name");
-            if (cJSON_IsString(author) && author->valuestring) {
-                sanitize_utf8_text(author->valuestring, out_item->author, sizeof(out_item->author));
-            }
-            snprintf(out_item->thumbnail_url, sizeof(out_item->thumbnail_url),
-                     "https://i.ytimg.com/vi/%s/default.jpg", video_id);
+            cJSON_Delete(root);
             if (out_stream_url && max_stream_len > 0) {
                 snprintf(out_stream_url, max_stream_len, "%s/latest_version?id=%s&itag=18", base_url, video_id);
             }
-            cJSON_Delete(root);
             return 0;
         } else if (root) {
             cJSON_Delete(root);
@@ -590,9 +581,6 @@ int invidious_fetch_channel_info(const char *instance, const char *channel_id, C
                         snprintf(out_info->avatar_url, sizeof(out_info->avatar_url), "%s", turl->valuestring);
                     }
                 }
-            }
-            if (out_info->avatar_url[0] == '\0' && channel_id[0] != '\0') {
-                snprintf(out_info->avatar_url, sizeof(out_info->avatar_url), "https://i.ytimg.com/vi/%s/default.jpg", channel_id);
             }
 
             cJSON_Delete(root);
