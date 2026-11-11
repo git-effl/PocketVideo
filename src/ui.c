@@ -537,13 +537,14 @@ void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *ite
         vita2d_draw_line(x, y, x, y + h, border_col);
         vita2d_draw_line(x + w, y, x + w, y + h, border_col);
 
-        /* Direct streamed channel round avatar icon */
-        float icon_cx = x + 40.0f;
-        float icon_cy = y + (h * 0.5f);
-        float icon_r  = 28.0f;
+        /* Direct streamed channel squared avatar icon */
+        float icon_x = x + 12.0f;
+        float icon_y = y + 8.0f;
+        float icon_w = 60.0f;
+        float icon_h = 60.0f;
 
-        vita2d_draw_fill_circle(icon_cx, icon_cy, icon_r + 2.0f, COLOR_BRAND_CYAN);
-        vita2d_draw_fill_circle(icon_cx, icon_cy, icon_r, RGBA8(8, 14, 28, 255));
+        vita2d_draw_rectangle(icon_x - 2.0f, icon_y - 2.0f, icon_w + 4.0f, icon_h + 4.0f, COLOR_BRAND_CYAN);
+        vita2d_draw_rectangle(icon_x, icon_y, icon_w, icon_h, RGBA8(8, 14, 28, 255));
 
         const char *thumb_key = (item->thumbnail_url[0] != '\0') ? item->thumbnail_url : item->id;
         vita2d_texture *avatar = ui_get_cached_thumbnail(thumb_key);
@@ -551,8 +552,7 @@ void ui_draw_video_card(float x, float y, float w, float h, const VideoItem *ite
             float tw = (float)vita2d_texture_get_width(avatar);
             float th = (float)vita2d_texture_get_height(avatar);
             if (tw > 0.0f && th > 0.0f) {
-                float scale = (icon_r * 2.0f) / tw;
-                vita2d_draw_texture_scale(avatar, icon_cx - icon_r, icon_cy - icon_r, scale, scale);
+                vita2d_draw_texture_scale(avatar, icon_x, icon_y, icon_w / tw, icon_h / th);
             }
         }
 
@@ -958,27 +958,29 @@ void ui_draw_channel_view(const ChannelInfo *channel, const VideoList *videos,
         ui_fetch_channel_assets(channel);
     }
 
-    /* Channel Banner Header (Y: 0..110) */
-    vita2d_draw_rectangle(0, 0, SCREEN_WIDTH, 110, RGBA8(16, 28, 52, 255));
+    /* Channel Banner Header (960x157) */
+    vita2d_draw_rectangle(0, 0, SCREEN_WIDTH, 157, RGBA8(16, 28, 52, 255));
     if (channel && channel->banner_url[0] != '\0') {
         vita2d_texture *banner_tex = ui_get_cached_thumbnail(channel->banner_url);
         if (banner_tex) {
             float bw = (float)vita2d_texture_get_width(banner_tex);
             float bh = (float)vita2d_texture_get_height(banner_tex);
             if (bw > 0.0f && bh > 0.0f) {
-                vita2d_draw_texture_scale(banner_tex, 0, 0, (float)SCREEN_WIDTH / bw, 110.0f / bh);
-                vita2d_draw_rectangle(0, 0, SCREEN_WIDTH, 110, RGBA8(0, 0, 0, 90));
+                vita2d_draw_texture_scale(banner_tex, 0, 0, (float)SCREEN_WIDTH / bw, 157.0f / bh);
+                vita2d_draw_rectangle(0, 0, SCREEN_WIDTH, 157, RGBA8(0, 0, 0, 80));
             }
         }
     }
-    vita2d_draw_line(0, 110, SCREEN_WIDTH, 110, COLOR_BRAND_CYAN);
+    vita2d_draw_line(0, 157, SCREEN_WIDTH, 157, COLOR_BRAND_CYAN);
 
-    /* Channel Avatar Icon (Top Middle-Left, X: 24..94, Y: 20..90) */
-    float icon_cx = 59.0f;
-    float icon_cy = 55.0f;
-    float icon_r  = 35.0f;
-    vita2d_draw_fill_circle(icon_cx, icon_cy, icon_r + 3.0f, COLOR_HIGHLIGHT_AMBER);
-    vita2d_draw_fill_circle(icon_cx, icon_cy, icon_r, RGBA8(8, 14, 28, 255));
+    /* Channel Squared Avatar Icon (X: 24..104, Y: 62..142) */
+    float icon_x = 24.0f;
+    float icon_y = 62.0f;
+    float icon_w = 80.0f;
+    float icon_h = 80.0f;
+
+    vita2d_draw_rectangle(icon_x - 3.0f, icon_y - 3.0f, icon_w + 6.0f, icon_h + 6.0f, COLOR_HIGHLIGHT_AMBER);
+    vita2d_draw_rectangle(icon_x, icon_y, icon_w, icon_h, RGBA8(8, 14, 28, 255));
 
     if (channel && channel->avatar_url[0] != '\0') {
         vita2d_texture *avatar_tex = ui_get_cached_thumbnail(channel->avatar_url);
@@ -986,26 +988,25 @@ void ui_draw_channel_view(const ChannelInfo *channel, const VideoList *videos,
             float aw = (float)vita2d_texture_get_width(avatar_tex);
             float ah = (float)vita2d_texture_get_height(avatar_tex);
             if (aw > 0.0f && ah > 0.0f) {
-                float scale = (icon_r * 2.0f) / aw;
-                vita2d_draw_texture_scale(avatar_tex, icon_cx - icon_r, icon_cy - icon_r, scale, scale);
+                vita2d_draw_texture_scale(avatar_tex, icon_x, icon_y, icon_w / aw, icon_h / ah);
             }
         }
     }
 
-    /* Channel Name & Sub Count (X: 110, Y: 46) */
+    /* Channel Name & Sub Count (X: 118, Y: 98 / 126) */
     if (channel) {
-        ui_draw_text(110, 48, COLOR_TEXT_LIGHT, 22, channel->author[0] ? channel->author : "YouTube Channel");
+        ui_draw_text(118, 98, COLOR_TEXT_LIGHT, 22, channel->author[0] ? channel->author : "YouTube Channel");
 
         char sub_str[40];
         format_views_commas(channel->sub_count, sub_str, sizeof(sub_str));
         char stats_buf[128];
         snprintf(stats_buf, sizeof(stats_buf), "%s subscribers", sub_str);
-        ui_draw_text(110, 72, COLOR_HIGHLIGHT_AMBER, 14, stats_buf);
+        ui_draw_text(118, 126, COLOR_HIGHLIGHT_AMBER, 14, stats_buf);
     }
 
-    /* Channel Description Snippet (Y: 118..148) */
-    vita2d_draw_rectangle(0, 111, SCREEN_WIDTH, 42, RGBA8(12, 20, 36, 245));
-    vita2d_draw_line(0, 153, SCREEN_WIDTH, 153, RGBA8(35, 55, 85, 255));
+    /* Channel Description Snippet (Y: 158..194) */
+    vita2d_draw_rectangle(0, 158, SCREEN_WIDTH, 36, RGBA8(12, 20, 36, 245));
+    vita2d_draw_line(0, 194, SCREEN_WIDTH, 194, RGBA8(35, 55, 85, 255));
 
     if (channel && channel->description[0] != '\0') {
         char desc_snip[120];
@@ -1016,22 +1017,22 @@ void ui_draw_channel_view(const ChannelInfo *channel, const VideoList *videos,
             memcpy(desc_snip, channel->description, 72);
             memcpy(desc_snip + 72, "...", 4);
         }
-        ui_draw_text(20, 134, COLOR_TEXT_DIM, 13, desc_snip);
+        ui_draw_text(20, 180, COLOR_TEXT_DIM, 13, desc_snip);
     } else {
-        ui_draw_text(20, 134, COLOR_TEXT_DIM, 13, "Official YouTube Channel");
+        ui_draw_text(20, 180, COLOR_TEXT_DIM, 13, "Official YouTube Channel");
     }
 
     /* Bio button / Square hint on right of description snippet */
-    draw_button_box(SCREEN_WIDTH - 170.0f, 116.0f, 150.0f, 32.0f,
+    draw_button_box(SCREEN_WIDTH - 170.0f, 161.0f, 150.0f, 30.0f,
                     RGBA8(205, 45, 120, 230), RGBA8(255, 120, 190, 255),
                     "Full Bio [SQ]", COLOR_TEXT_LIGHT, 12);
 
-    /* Category Tabs: Home, Videos, Shorts, Live, Playlists (Y: 154..190) */
+    /* Category Tabs: Home, Videos, Shorts, Live, Playlists (Y: 198..230) */
     const char *tabs[] = {"Home", "Videos", "Shorts", "Live", "Playlists"};
     int num_tabs = 5;
     float tab_w = 176.0f;
     float tab_start_x = 20.0f;
-    float tab_y = 158.0f;
+    float tab_y = 198.0f;
 
     for (int t = 0; t < num_tabs; t++) {
         float tx = tab_start_x + (t * (tab_w + 10.0f));
@@ -1042,10 +1043,10 @@ void ui_draw_channel_view(const ChannelInfo *channel, const VideoList *videos,
                         is_active ? COLOR_HIGHLIGHT_AMBER : COLOR_TEXT_LIGHT, 14);
     }
 
-    /* Channel Videos Feed (Y: 196..530) */
-    int card_h = 76;
-    int gap = 8;
-    int start_y = 196;
+    /* Channel Videos Feed (Y: 236..530) */
+    int card_h = 68;
+    int gap = 6;
+    int start_y = 236;
     int visible = 4;
 
     int offset = 0;
@@ -1062,7 +1063,7 @@ void ui_draw_channel_view(const ChannelInfo *channel, const VideoList *videos,
             ui_draw_video_card(20, cy, 920, card_h, &videos->items[idx], (idx == selected_video_idx));
         }
     } else {
-        ui_draw_text_centered(480.0f, 320.0f, COLOR_TEXT_DIM, 16,
+        ui_draw_text_centered(480.0f, 350.0f, COLOR_TEXT_DIM, 16,
                               "No content available under this category tab.");
     }
 
