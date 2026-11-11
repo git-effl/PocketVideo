@@ -277,9 +277,13 @@ static int is_full_emoji_unicode_codepoint(uint32_t cp) {
 }
 
 static vita2d_font* select_font_for_codepoint(uint32_t cp) {
-    /* 1. Intercept all Unicode Emoji Codepoints to route to g_font_emoji or return NULL to prevent .notdef cyan boxes */
+    /* 1. Emoji & High SMP Codepoints:
+     * NotoColorEmoji-Regular.ttf is loaded, but because FreeType in vita2d lacks CBDT color
+     * PNG table rendering, passing emoji codepoints to vita2d_font_draw_text causes FreeType
+     * to render glyph 0 (.notdef), which displays cyan frame boxes [ ] [ ] [ ] [ ].
+     * Returning NULL for emoji codepoints prevents .notdef cyan frame boxes from drawing.
+     */
     if (is_full_emoji_unicode_codepoint(cp)) {
-        if (g_font_emoji) return g_font_emoji;
         return NULL;
     }
 
@@ -322,7 +326,7 @@ void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const
 
         vita2d_font *target_font = select_font_for_codepoint(cp);
 
-        if (cur_font == NULL) {
+        if (cur_font == NULL && target_font != NULL) {
             cur_font = target_font;
         }
 
@@ -336,15 +340,13 @@ void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const
                     float pvf_scale = (float)size / 20.0f;
                     vita2d_pvf_draw_text(g_font_pvf_fallback, cur_x, y, color, pvf_scale, chunk);
                     cur_x += (float)vita2d_pvf_text_width(g_font_pvf_fallback, pvf_scale, chunk);
-                } else {
-                    cur_x += (float)(chunk_len * (size * 0.52f));
                 }
                 chunk_len = 0;
             }
             cur_font = target_font;
         }
 
-        if (bytes > 0 && chunk_len + bytes < sizeof(chunk)) {
+        if (target_font != NULL && bytes > 0 && chunk_len + bytes < sizeof(chunk)) {
             memcpy(chunk + chunk_len, prev_p, bytes);
             chunk_len += bytes;
         }
@@ -381,7 +383,7 @@ int ui_get_text_width(unsigned int size, const char *text) {
 
         vita2d_font *target_font = select_font_for_codepoint(cp);
 
-        if (cur_font == NULL) {
+        if (cur_font == NULL && target_font != NULL) {
             cur_font = target_font;
         }
 
@@ -393,15 +395,13 @@ int ui_get_text_width(unsigned int size, const char *text) {
                 } else if (g_font_pvf_fallback) {
                     float pvf_scale = (float)size / 20.0f;
                     total_w += vita2d_pvf_text_width(g_font_pvf_fallback, pvf_scale, chunk);
-                } else {
-                    total_w += (int)(chunk_len * (size * 0.52f));
                 }
                 chunk_len = 0;
             }
             cur_font = target_font;
         }
 
-        if (bytes > 0 && chunk_len + bytes < sizeof(chunk)) {
+        if (target_font != NULL && bytes > 0 && chunk_len + bytes < sizeof(chunk)) {
             memcpy(chunk + chunk_len, prev_p, bytes);
             chunk_len += bytes;
         }
@@ -414,8 +414,6 @@ int ui_get_text_width(unsigned int size, const char *text) {
         } else if (g_font_pvf_fallback) {
             float pvf_scale = (float)size / 20.0f;
             total_w += vita2d_pvf_text_width(g_font_pvf_fallback, pvf_scale, chunk);
-        } else {
-            total_w += (int)(chunk_len * (size * 0.52f));
         }
     }
 
