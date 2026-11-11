@@ -40,16 +40,6 @@ void format_duration(int seconds, char *buffer, size_t max_len) {
     }
 }
 
-static int is_emoji_codepoint(uint32_t cp) {
-    if (cp >= 0x1F000 && cp <= 0x1FFFF) return 1; /* High SMP Emoji & Pictograph Blocks */
-    if (cp >= 0x2600  && cp <= 0x27BF)  return 1; /* Misc Symbols & Dingbats */
-    if (cp >= 0x2300  && cp <= 0x23FF)  return 1; /* Misc Technical Emojis */
-    if (cp >= 0x2B00  && cp <= 0x2BFF)  return 1; /* Misc Symbols & Arrows */
-    if (cp >= 0xFE00  && cp <= 0xFE0F)  return 1; /* Variation Selectors */
-    if (cp == 0x200D) return 1;                 /* Zero-width joiner */
-    return 0;
-}
-
 void sanitize_utf8_text(const char *src, char *dst, size_t max_len) {
     if (!dst || max_len == 0) return;
     if (!src) { dst[0] = '\0'; return; }
@@ -59,35 +49,18 @@ void sanitize_utf8_text(const char *src, char *dst, size_t max_len) {
 
     while (*p && out + 1 < max_len) {
         unsigned char b = *p;
-        uint32_t cp = 0;
         int len = 0;
 
         if (b < 0x80) {
-            cp = b;
             len = 1;
         } else if ((b & 0xE0) == 0xC0) {
-            if ((p[1] & 0xC0) == 0x80) {
-                cp = ((b & 0x1F) << 6) | (p[1] & 0x3F);
-                len = 2;
-            } else { p++; continue; }
+            if ((p[1] & 0xC0) == 0x80) len = 2; else { p++; continue; }
         } else if ((b & 0xF0) == 0xE0) {
-            if ((p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80) {
-                cp = ((b & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
-                len = 3;
-            } else { p++; continue; }
+            if ((p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80) len = 3; else { p++; continue; }
         } else if ((b & 0xF8) == 0xF0) {
-            if ((p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80 && (p[3] & 0xC0) == 0x80) {
-                cp = ((b & 0x07) << 18) | ((p[1] & 0x3F) << 12) | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
-                len = 4;
-            } else { p++; continue; }
+            if ((p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80 && (p[3] & 0xC0) == 0x80) len = 4; else { p++; continue; }
         } else {
             p++;
-            continue;
-        }
-
-        /* Skip all emoji codepoints and replacement characters */
-        if (is_emoji_codepoint(cp) || cp == 0xFFFD) {
-            p += len;
             continue;
         }
 
