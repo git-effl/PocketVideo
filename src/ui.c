@@ -78,14 +78,8 @@ int ui_init(void) {
         g_font_jp = vita2d_load_font_file("assets/fonts/NotoSansJP-Regular.ttf");
     }
 
-    /* 3. NotoSansSymbols2-Regular.ttf & NotoColorEmoji-Regular.ttf for Emojis & Symbols */
-    g_font_emoji = vita2d_load_font_file("app0:assets/fonts/NotoSansSymbols2-Regular.ttf");
-    if (!g_font_emoji) {
-        g_font_emoji = vita2d_load_font_file("assets/fonts/NotoSansSymbols2-Regular.ttf");
-    }
-    if (!g_font_emoji) {
-        g_font_emoji = vita2d_load_font_file("app0:assets/fonts/NotoColorEmoji-Regular.ttf");
-    }
+    /* 3. NotoColorEmoji-Regular.ttf for Emojis */
+    g_font_emoji = vita2d_load_font_file("app0:assets/fonts/NotoColorEmoji-Regular.ttf");
     if (!g_font_emoji) {
         g_font_emoji = vita2d_load_font_file("assets/fonts/NotoColorEmoji-Regular.ttf");
     }
