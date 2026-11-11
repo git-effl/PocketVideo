@@ -231,16 +231,20 @@ static uint32_t utf8_next_codepoint(const char **p) {
     return cp;
 }
 
-static vita2d_font* select_font_for_codepoint(uint32_t cp) {
-    /* 1. Emoji & High SMP Ranges: Skip unrenderable color bitmap emojis (prevent tofu boxes) */
-    if ((cp >= 0x1F000 && cp <= 0x1FAFF) ||
-        (cp >= 0x1F300 && cp <= 0x1F6FF) ||
-        (cp >= 0x1F100 && cp <= 0x1F1FF) ||
-        (cp >= 0x1F900 && cp <= 0x1F9FF)) {
-        return NULL;
-    }
+static int is_emoji_codepoint(uint32_t cp) {
+    if (cp >= 0x1F000 && cp <= 0x1FFFF) return 1; /* High SMP Emoji & Pictograph Blocks */
+    if (cp >= 0x2600  && cp <= 0x27BF)  return 1; /* Misc Symbols & Dingbats */
+    if (cp >= 0x2300  && cp <= 0x23FF)  return 1; /* Misc Technical Emojis */
+    if (cp >= 0x2B00  && cp <= 0x2BFF)  return 1; /* Misc Symbols & Arrows */
+    if (cp >= 0xFE00  && cp <= 0xFE0F)  return 1; /* Variation Selectors */
+    if (cp == 0x200D) return 1;                 /* Zero-width joiner */
+    return 0;
+}
 
-    /* 2. Japanese & CJK Ranges */
+static vita2d_font* select_font_for_codepoint(uint32_t cp) {
+    if (is_emoji_codepoint(cp)) return NULL;
+
+    /* Japanese & CJK Ranges */
     if ((cp >= 0x3040 && cp <= 0x309F) || /* Hiragana */
         (cp >= 0x30A0 && cp <= 0x30FF) || /* Katakana */
         (cp >= 0x31F0 && cp <= 0x31FF) || /* Katakana Phonetic Extensions */
@@ -251,7 +255,7 @@ static vita2d_font* select_font_for_codepoint(uint32_t cp) {
         if (g_font_jp) return g_font_jp;
     }
 
-    /* 3. Primary font for Latin, Cyrillic, Greek, Numbers & BMP Symbols */
+    /* Primary font for Latin, Cyrillic, Greek, Numbers & BMP Symbols */
     if (g_font_noto)  return g_font_noto;
     if (g_font_jp)    return g_font_jp;
 
@@ -260,17 +264,6 @@ static vita2d_font* select_font_for_codepoint(uint32_t cp) {
 
 void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const char *text) {
     if (!text || text[0] == '\0') return;
-
-    /* Fast path when only primary font is loaded */
-    if (!g_font_jp) {
-        if (g_font_noto) {
-            vita2d_font_draw_text(g_font_noto, (int)x, (int)y, color, size, text);
-        } else if (g_font_pvf_fallback) {
-            float pvf_scale = (float)size / 20.0f;
-            vita2d_pvf_draw_text(g_font_pvf_fallback, x, y, color, pvf_scale, text);
-        }
-        return;
-    }
 
     /* Multi-font fallback rendering for mixed Latin, Cyrillic, Greek, Japanese & Symbols */
     const char *p = text;
@@ -284,8 +277,8 @@ void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const
         uint32_t cp = utf8_next_codepoint(&p);
         size_t bytes = (size_t)(p - prev_p);
 
-        /* Skip unrenderable high emoji codepoints to avoid drawing tofu boxes [ ] */
-        if (cp >= 0x1F000 && cp <= 0x1FAFF) {
+        /* Skip unrenderable emoji codepoints to avoid drawing tofu boxes [ ] */
+        if (is_emoji_codepoint(cp) || cp == 0xFFFD) {
             continue;
         }
 
@@ -333,16 +326,6 @@ void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const
 int ui_get_text_width(unsigned int size, const char *text) {
     if (!text || text[0] == '\0') return 0;
 
-    if (!g_font_jp) {
-        if (g_font_noto) {
-            return vita2d_font_text_width(g_font_noto, size, text);
-        } else if (g_font_pvf_fallback) {
-            float pvf_scale = (float)size / 20.0f;
-            return vita2d_pvf_text_width(g_font_pvf_fallback, pvf_scale, text);
-        }
-        return (int)(strlen(text) * (size * 0.52f));
-    }
-
     const char *p = text;
     int total_w = 0;
     char chunk[512];
@@ -354,8 +337,8 @@ int ui_get_text_width(unsigned int size, const char *text) {
         uint32_t cp = utf8_next_codepoint(&p);
         size_t bytes = (size_t)(p - prev_p);
 
-        /* Skip unrenderable high emoji codepoints */
-        if (cp >= 0x1F000 && cp <= 0x1FAFF) {
+        /* Skip unrenderable emoji codepoints */
+        if (is_emoji_codepoint(cp) || cp == 0xFFFD) {
             continue;
         }
 

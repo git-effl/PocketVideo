@@ -40,73 +40,75 @@ void format_duration(int seconds, char *buffer, size_t max_len) {
     }
 }
 
+static int is_emoji_codepoint(uint32_t cp) {
+    if (cp >= 0x1F000 && cp <= 0x1FFFF) return 1; /* High SMP Emoji & Pictograph Blocks */
+    if (cp >= 0x2600  && cp <= 0x27BF)  return 1; /* Misc Symbols & Dingbats */
+    if (cp >= 0x2300  && cp <= 0x23FF)  return 1; /* Misc Technical Emojis */
+    if (cp >= 0x2B00  && cp <= 0x2BFF)  return 1; /* Misc Symbols & Arrows */
+    if (cp >= 0xFE00  && cp <= 0xFE0F)  return 1; /* Variation Selectors */
+    if (cp == 0x200D) return 1;                 /* Zero-width joiner */
+    return 0;
+}
+
 void sanitize_utf8_text(const char *src, char *dst, size_t max_len) {
     if (!dst || max_len == 0) return;
     if (!src) { dst[0] = '\0'; return; }
 
     size_t out = 0;
     const unsigned char *p = (const unsigned char *)src;
+
     while (*p && out + 1 < max_len) {
         unsigned char b = *p;
-        if ((b & 0xF8) == 0xF0) {
-            unsigned char b1 = p[1], b2 = p[2], b3 = p[3];
-            if ((b1 & 0xC0) == 0x80 && (b2 & 0xC0) == 0x80 && (b3 & 0xC0) == 0x80) {
-                if (out + 4 < max_len) {
-                    dst[out++] = (char)b;
-                    dst[out++] = (char)b1;
-                    dst[out++] = (char)b2;
-                    dst[out++] = (char)b3;
-                    p += 4;
-                    continue;
-                }
-                break;
-            }
-            p++;
-        } else if ((b & 0xF0) == 0xE0) {
-            unsigned char b1 = p[1], b2 = p[2];
-            if ((b1 & 0xC0) == 0x80 && (b2 & 0xC0) == 0x80) {
-                if ((b == 0xEF && b1 == 0xB8 && (b2 == 0x8E || b2 == 0x8F)) ||
-                    (b == 0xE2 && b1 == 0x80 && b2 == 0x8D)) {
-                    p += 3;
-                    continue;
-                }
-                if (out + 3 < max_len) {
-                    dst[out++] = (char)b;
-                    dst[out++] = (char)b1;
-                    dst[out++] = (char)b2;
-                    p += 3;
-                    continue;
-                }
-                break;
-            }
-            p++;
+        uint32_t cp = 0;
+        int len = 0;
+
+        if (b < 0x80) {
+            cp = b;
+            len = 1;
         } else if ((b & 0xE0) == 0xC0) {
-            unsigned char b1 = p[1];
-            if ((b1 & 0xC0) == 0x80) {
-                if (out + 2 < max_len) {
-                    dst[out++] = (char)b;
-                    dst[out++] = (char)b1;
-                    p += 2;
-                    continue;
-                }
-                break;
-            }
-            p++;
-        } else if (b < 0x80) {
-            if (b == '\r') {
-                p++;
-                continue;
-            }
-            if (b == '\t') b = ' ';
-            if (out == 0 && b == ' ') {
-                p++;
-                continue;
-            }
-            dst[out++] = (char)b;
-            p++;
+            if ((p[1] & 0xC0) == 0x80) {
+                cp = ((b & 0x1F) << 6) | (p[1] & 0x3F);
+                len = 2;
+            } else { p++; continue; }
+        } else if ((b & 0xF0) == 0xE0) {
+            if ((p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80) {
+                cp = ((b & 0x0F) << 12) | ((p[1] & 0x3F) << 6) | (p[2] & 0x3F);
+                len = 3;
+            } else { p++; continue; }
+        } else if ((b & 0xF8) == 0xF0) {
+            if ((p[1] & 0xC0) == 0x80 && (p[2] & 0xC0) == 0x80 && (p[3] & 0xC0) == 0x80) {
+                cp = ((b & 0x07) << 18) | ((p[1] & 0x3F) << 12) | ((p[2] & 0x3F) << 6) | (p[3] & 0x3F);
+                len = 4;
+            } else { p++; continue; }
         } else {
             p++;
+            continue;
         }
+
+        /* Skip all emoji codepoints and replacement characters */
+        if (is_emoji_codepoint(cp) || cp == 0xFFFD) {
+            p += len;
+            continue;
+        }
+
+        if (b < 0x80) {
+            if (b == '\r') { p += len; continue; }
+            if (b == '\t') b = ' ';
+            if (out == 0 && b == ' ') { p += len; continue; }
+            dst[out++] = (char)b;
+        } else {
+            if (out + len < max_len) {
+                for (int i = 0; i < len; i++) {
+                    dst[out++] = (char)p[i];
+                }
+            }
+        }
+        p += len;
+    }
+
+    /* Trim trailing whitespace */
+    while (out > 0 && (dst[out - 1] == ' ' || dst[out - 1] == '\t' || dst[out - 1] == '\n' || dst[out - 1] == '\r')) {
+        out--;
     }
     dst[out] = '\0';
 }
