@@ -311,16 +311,23 @@ int invidious_fetch_trending(const char *instance, VideoList *out_list) {
     snprintf(out_list->instance, sizeof(out_list->instance), "%s", base_url);
 
     char endpoint[512];
-    snprintf(endpoint, sizeof(endpoint), "%s/api/v1/popular", base_url);
+    /* 1. Primary: Invidious /api/v1/trending */
+    snprintf(endpoint, sizeof(endpoint), "%s/api/v1/trending", base_url);
     int r1 = fetch_invidious_array_endpoint(endpoint, out_list);
 
-    if (out_list->count < MAX_VIDEOS) {
+    /* 2. Secondary fallback: /api/v1/popular if trending is empty */
+    if (out_list->count == 0) {
         snprintf(endpoint, sizeof(endpoint), "%s/api/v1/popular", base_url);
-        int r2 = fetch_invidious_array_endpoint(endpoint, out_list);
-        if (out_list->count == 0 && r1 < 0) return (r2 < 0) ? r1 : out_list->count;
+        fetch_invidious_array_endpoint(endpoint, out_list);
     }
 
-    inv_log("[Invidious] Loaded %d popular videos.", out_list->count);
+    /* 3. Tertiary fallback: Piped trending feed if Invidious endpoints return empty */
+    if (out_list->count == 0) {
+        snprintf(endpoint, sizeof(endpoint), "%s/trending?region=US", PIPED_FALLBACK_HOST);
+        fetch_piped_array_endpoint(endpoint, out_list);
+    }
+
+    inv_log("[Invidious] Loaded %d trending/popular videos.", out_list->count);
     return out_list->count;
 }
 
