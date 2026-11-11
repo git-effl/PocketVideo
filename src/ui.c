@@ -232,22 +232,54 @@ static uint32_t utf8_next_codepoint(const char **p) {
 }
 
 static int is_full_emoji_unicode_codepoint(uint32_t cp) {
-    if (cp >= 0x1F000 && cp <= 0x1FAFF) return 1; /* Primary Unicode Emoji Blocks (Emoticons, Food, Animals, Objects, Symbols, Flags, Ext-A) */
-    if (cp >= 0x1F100 && cp <= 0x1F1FF) return 1; /* Enclosed Alphanumeric & Regional Indicator Flags (A-Z) */
+    /* 1. Primary Unicode Emoji Blocks & Supplements (SMP U+1F000..U+1FAFF) */
+    if (cp >= 0x1F300 && cp <= 0x1F5FF) return 1; /* Misc Symbols & Pictographs */
+    if (cp >= 0x1F600 && cp <= 0x1F64F) return 1; /* Emoticons / Smileys */
+    if (cp >= 0x1F680 && cp <= 0x1F6FF) return 1; /* Transport & Map Symbols */
+    if (cp >= 0x1F700 && cp <= 0x1F77F) return 1; /* Alchemical Symbols */
+    if (cp >= 0x1F780 && cp <= 0x1F7FF) return 1; /* Geometric Shapes Extended */
+    if (cp >= 0x1F800 && cp <= 0x1F8FF) return 1; /* Supplemental Arrows-C */
+    if (cp >= 0x1F900 && cp <= 0x1F9FF) return 1; /* Supplemental Symbols & Pictographs */
+    if (cp >= 0x1FA00 && cp <= 0x1FA6F) return 1; /* Chess Symbols */
+    if (cp >= 0x1FA70 && cp <= 0x1FAFF) return 1; /* Symbols & Pictographs Extended-A (Emoji 12.0..16.0) */
+    if (cp >= 0x1F000 && cp <= 0x1F02F) return 1; /* Mahjong Tiles */
+    if (cp >= 0x1F030 && cp <= 0x1F09F) return 1; /* Domino Tiles */
+    if (cp >= 0x1F0A0 && cp <= 0x1F0FF) return 1; /* Playing Cards */
+    if (cp >= 0x1F100 && cp <= 0x1F1FF) return 1; /* Enclosed Alphanumerics & Regional Indicators (U+1F1E6..U+1F1FF) */
     if (cp >= 0x1F200 && cp <= 0x1F2FF) return 1; /* Enclosed Ideographic Supplement */
-    if (cp >= 0x2600  && cp <= 0x26FF)  return 1; /* Miscellaneous Symbols */
-    if (cp >= 0x2700  && cp <= 0x27BF)  return 1; /* Dingbats */
-    if (cp >= 0x2300  && cp <= 0x23FF)  return 1; /* Miscellaneous Technical */
-    if (cp >= 0x2B00  && cp <= 0x2BFF)  return 1; /* Miscellaneous Symbols and Arrows */
+
+    /* 2. BMP Emoji & Symbol Blocks (U+2000..U+3300) */
+    if (cp >= 0x2600  && cp <= 0x26FF)  return 1; /* Misc Symbols (e.g. ☀️ ☔ ☕ ⚡ ⚽ ⚓ ⚠️ 🔴 🔵 ♠️ ♥️) */
+    if (cp >= 0x2700  && cp <= 0x27BF)  return 1; /* Dingbats (e.g. ✂️ ✈️ ✉️ ✏️ ✔️ ✖️ ❌ ❓ ❗ ❤️ ➡️) */
+    if (cp >= 0x2300  && cp <= 0x23FF)  return 1; /* Misc Technical (e.g. ⌚ ⌛ ⏩ ⏪ ⏰ ⏱️ ⏳ ⏸️ ⏹️) */
+    if (cp >= 0x2B00  && cp <= 0x2BFF)  return 1; /* Misc Symbols and Arrows (e.g. ⭐ ⭕ ⬛ ⬜ 🟥 🟦 🛑) */
     if (cp >= 0x2190  && cp <= 0x21FF)  return 1; /* Arrows */
-    if (cp >= 0xFE00  && cp <= 0xFE0F)  return 1; /* Variation Selectors */
-    if (cp == 0x200D) return 1;                 /* Zero-width joiner */
+    if (cp >= 0x2934  && cp <= 0x2935)  return 1; /* Curved Arrows */
+    if (cp >= 0x2B05  && cp <= 0x2B07)  return 1;
+    if (cp >= 0x2B50  && cp <= 0x2B55)  return 1;
+    if (cp == 0x3297  || cp == 0x3299)  return 1; /* Circled Ideographs */
+    if (cp == 0x3030  || cp == 0x303D)  return 1;
+    if (cp == 0x00A9  || cp == 0x00AE)  return 1; /* Copyright © / Registered ® */
+    if (cp == 0x203C  || cp == 0x2049)  return 1; /* Double Exclamation / Interrobang */
+    if (cp == 0x2122  || cp == 0x2139)  return 1; /* Trademark / Info */
+    if (cp >= 0x21A9  && cp <= 0x21AA)  return 1;
+    if (cp == 0x24C2)                   return 1;
+    if (cp >= 0x25AA  && cp <= 0x25AB)  return 1;
+    if (cp >= 0x25FB  && cp <= 0x25FE)  return 1;
+
+    /* 3. Modifiers, Joiners & Tags */
+    if (cp >= 0x1F3FB && cp <= 0x1F3FF) return 1; /* Skin Tone Modifiers */
+    if (cp >= 0xFE00  && cp <= 0xFE0F)  return 1; /* Variation Selectors (VS1..VS16) */
+    if (cp == 0x200D)                   return 1; /* Zero Width Joiner (ZWJ) */
+    if (cp >= 0xE0000 && cp <= 0xE007F) return 1; /* Subdivision Tag Bytes */
+
     return 0;
 }
 
 static vita2d_font* select_font_for_codepoint(uint32_t cp) {
-    /* 1. Emoji & High SMP Ranges: Skip unrenderable color bitmap emojis (prevents cyan frame boxes [ ]) */
+    /* 1. Intercept all Unicode Emoji Codepoints to route to g_font_emoji or return NULL to prevent .notdef cyan boxes */
     if (is_full_emoji_unicode_codepoint(cp)) {
+        if (g_font_emoji) return g_font_emoji;
         return NULL;
     }
 
@@ -465,15 +497,15 @@ void ui_draw_search_bar(const char *query, int is_search_mode, int search_type) 
         ui_draw_text(54, 61, COLOR_TEXT_LIGHT, 15, display_q);
     } else {
         ui_draw_text(54, 61, COLOR_TEXT_DIM, 14,
-                     (search_type == 1) ? "Search Channels (Press \xCE\x94 TRIANGLE / \xE2\x96\xA1 SQUARE)..."
-                                        : "Search YouTube (Press \xCE\x94 TRIANGLE / \xE2\x96\xA1 SQUARE)...");
+                     (search_type == 1) ? "Search Channels (Press \xCE\x94 TRIANGLE / [SQ] SQUARE)..."
+                                        : "Search YouTube (Press \xCE\x94 TRIANGLE / [SQ] SQUARE)...");
     }
 
     /* Mode button: Videos / Channels (x = 728..818) */
     unsigned int mode_bg = (search_type == 1) ? RGBA8(200, 45, 120, 235) : RGBA8(0, 130, 195, 235);
     draw_button_box(728.0f, 38.0f, 90.0f, 34.0f,
                     mode_bg, COLOR_BRAND_CYAN,
-                    (search_type == 1) ? "Channels \xE2\x96\xA1" : "Videos \xE2\x96\xA1",
+                    (search_type == 1) ? "Channels [SQ]" : "Videos [SQ]",
                     COLOR_TEXT_LIGHT, 12);
 
     /* Search button (x = 824..880) with Delta symbol \xCE\x94 */
@@ -753,7 +785,7 @@ void ui_draw_player_screen(const VideoItem *item, vita2d_texture *video_tex,
 
         draw_button_box(612.0f, 492.0f, 160.0f, 38.0f,
                         RGBA8(205, 45, 120, bar_a), RGBA8(255, 120, 190, a),
-                        "Description \xE2\x96\xA1", RGBA8(245, 245, 248, a), 13);
+                        "Description [SQ]", RGBA8(245, 245, 248, a), 13);
 
         float sq_x = 620.0f;
         float sq_y = 504.0f;
@@ -787,7 +819,7 @@ void ui_draw_description_modal(const VideoItem *item, int scroll_line) {
     vita2d_draw_line(mx + mw, my, mx + mw, my + mh, RGBA8(40, 65, 105, 255));
     vita2d_draw_line(mx, my + mh, mx + mw, my + mh, RGBA8(40, 65, 105, 255));
 
-    ui_draw_text(mx + 24, my + 34, COLOR_BRAND_CYAN, 20, "Video Description & Metadata \xE2\x96\xA1");
+    ui_draw_text(mx + 24, my + 34, COLOR_BRAND_CYAN, 20, "Video Description & Metadata [SQ]");
     vita2d_draw_line(mx + 24, my + 46, mx + mw - 24, my + 46, RGBA8(30, 50, 80, 255));
 
     char truncated_title[74];
@@ -846,7 +878,7 @@ void ui_draw_description_modal(const VideoItem *item, int scroll_line) {
 
     draw_button_box(mx + mw - 180.0f, my + mh - 44.0f, 156.0f, 32.0f,
                     RGBA8(0, 130, 195, 235), COLOR_BRAND_CYAN,
-                    "Close (Circle / \xE2\x96\xA1)", COLOR_TEXT_LIGHT, 12);
+                    "Close (Circle / [SQ])", COLOR_TEXT_LIGHT, 12);
 }
 
 void ui_draw_channel_description_modal(const ChannelInfo *channel, int scroll_line) {
@@ -867,7 +899,7 @@ void ui_draw_channel_description_modal(const ChannelInfo *channel, int scroll_li
     vita2d_draw_line(mx + mw, my, mx + mw, my + mh, RGBA8(40, 65, 105, 255));
     vita2d_draw_line(mx, my + mh, mx + mw, my + mh, RGBA8(40, 65, 105, 255));
 
-    ui_draw_text(mx + 24, my + 34, COLOR_HIGHLIGHT_AMBER, 20, "Channel Bio & Full Description \xE2\x96\xA1");
+    ui_draw_text(mx + 24, my + 34, COLOR_HIGHLIGHT_AMBER, 20, "Channel Bio & Full Description [SQ]");
     vita2d_draw_line(mx + 24, my + 46, mx + mw - 24, my + 46, RGBA8(30, 50, 80, 255));
 
     ui_draw_text(mx + 24, my + 76, COLOR_TEXT_LIGHT, 18, channel->author[0] ? channel->author : "Channel Info");
@@ -917,7 +949,7 @@ void ui_draw_channel_description_modal(const ChannelInfo *channel, int scroll_li
 
     draw_button_box(mx + mw - 180.0f, my + mh - 44.0f, 156.0f, 32.0f,
                     RGBA8(217, 119, 6, 235), COLOR_HIGHLIGHT_AMBER,
-                    "Close (Circle / \xE2\x96\xA1)", COLOR_TEXT_LIGHT, 12);
+                    "Close (Circle / [SQ])", COLOR_TEXT_LIGHT, 12);
 }
 
 void ui_draw_channel_view(const ChannelInfo *channel, const VideoList *videos,
@@ -994,7 +1026,7 @@ void ui_draw_channel_view(const ChannelInfo *channel, const VideoList *videos,
     /* Bio button / Square hint on right of description snippet */
     draw_button_box(SCREEN_WIDTH - 170.0f, 116.0f, 150.0f, 32.0f,
                     RGBA8(205, 45, 120, 230), RGBA8(255, 120, 190, 255),
-                    "Full Bio \xE2\x96\xA1", COLOR_TEXT_LIGHT, 12);
+                    "Full Bio [SQ]", COLOR_TEXT_LIGHT, 12);
 
     /* Category Tabs: Home, Videos, Shorts, Live, Playlists (Y: 154..190) */
     const char *tabs[] = {"Home", "Videos", "Shorts", "Live", "Playlists"};

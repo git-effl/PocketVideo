@@ -453,10 +453,10 @@ int main(int argc, char *argv[]) {
         int count = invidious_fetch_trending(INVIDIOUS_DEFAULT_HOST, &g_trending_cache);
         if (count > 0) {
             memcpy(&g_active_list, &g_trending_cache, sizeof(VideoList));
-            snprintf(g_status_msg, sizeof(g_status_msg), "Loaded %d trending videos.", count);
+            snprintf(g_status_msg, sizeof(g_status_msg), "Loaded %d popular videos.", count);
             g_current_view = VIEW_TRENDING_LIST;
         } else {
-            snprintf(g_status_msg, sizeof(g_status_msg), "Failed to load trending feed.");
+            snprintf(g_status_msg, sizeof(g_status_msg), "Failed to load popular feed.");
             g_current_view = VIEW_HOME_BUBBLES;
         }
     } else {
@@ -791,7 +791,7 @@ int main(int argc, char *argv[]) {
         }
         else if (g_current_view == VIEW_TRENDING_LIST) {
             ui_draw_background();
-            ui_draw_status_bar(g_is_search_mode ? "Search Results" : "Trending Videos");
+            ui_draw_status_bar(g_is_search_mode ? "Search Results" : "Popular Videos");
             ui_draw_search_bar(g_search_query, g_is_search_mode, g_search_type);
 
             int start_y = 80;
