@@ -78,10 +78,10 @@ int ui_init(void) {
         g_font_jp = vita2d_load_font_file("assets/fonts/NotoSansJP-Regular.ttf");
     }
 
-    /* 3. NotoColorEmoji-Regular.ttf for Emojis */
-    g_font_emoji = vita2d_load_font_file("app0:assets/fonts/NotoColorEmoji-Regular.ttf");
+    /* 3. NotoEmoji-Regular.ttf for Monochrome Emojis & Symbols */
+    g_font_emoji = vita2d_load_font_file("app0:assets/fonts/NotoEmoji-Regular.ttf");
     if (!g_font_emoji) {
-        g_font_emoji = vita2d_load_font_file("assets/fonts/NotoColorEmoji-Regular.ttf");
+        g_font_emoji = vita2d_load_font_file("assets/fonts/NotoEmoji-Regular.ttf");
     }
 
     if (!g_font_noto && !g_font_jp) {
@@ -277,14 +277,10 @@ static int is_full_emoji_unicode_codepoint(uint32_t cp) {
 }
 
 static vita2d_font* select_font_for_codepoint(uint32_t cp) {
-    /* 1. Emoji & High SMP Codepoints:
-     * NotoColorEmoji-Regular.ttf is loaded, but because FreeType in vita2d lacks CBDT color
-     * PNG table rendering, passing emoji codepoints to vita2d_font_draw_text causes FreeType
-     * to render glyph 0 (.notdef), which displays cyan frame boxes [ ] [ ] [ ] [ ].
-     * Returning NULL for emoji codepoints prevents .notdef cyan frame boxes from drawing.
-     */
+    /* 1. Emojis & Symbols: Route all Unicode Emoji Codepoints to NotoEmoji-Regular.ttf (monochrome vector emoji font) */
     if (is_full_emoji_unicode_codepoint(cp)) {
-        return NULL;
+        if (g_font_emoji) return g_font_emoji;
+        if (g_font_noto)  return g_font_noto;
     }
 
     /* 2. Japanese & CJK Ranges */
