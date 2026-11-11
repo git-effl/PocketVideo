@@ -246,10 +246,9 @@ static int is_full_emoji_unicode_codepoint(uint32_t cp) {
 }
 
 static vita2d_font* select_font_for_codepoint(uint32_t cp) {
-    /* 1. Intercept Noto Sans for all Unicode Emoji codepoints and use Noto Color Emoji font */
+    /* 1. Emoji & High SMP Ranges: Skip unrenderable color bitmap emojis (prevents cyan frame boxes [ ]) */
     if (is_full_emoji_unicode_codepoint(cp)) {
-        if (g_font_emoji) return g_font_emoji;
-        if (g_font_noto)  return g_font_noto;
+        return NULL;
     }
 
     /* 2. Japanese & CJK Ranges */
@@ -266,7 +265,6 @@ static vita2d_font* select_font_for_codepoint(uint32_t cp) {
     /* 3. Primary font Noto Sans for Latin, Cyrillic, Greek, Numbers & Symbols */
     if (g_font_noto)  return g_font_noto;
     if (g_font_jp)    return g_font_jp;
-    if (g_font_emoji) return g_font_emoji;
 
     return NULL;
 }
