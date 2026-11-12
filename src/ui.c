@@ -1,8 +1,10 @@
 #include "ui.h"
 #include "network.h"
+#include "emoji_colr.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #if defined(__has_include)
   #if __has_include(<ft2build.h>)
@@ -23,12 +25,12 @@ vita2d_font *g_font_noto           = NULL;
 vita2d_font *g_font_jp             = NULL;
 vita2d_font *g_font_emoji          = NULL;
 vita2d_pvf  *g_font_pvf_fallback   = NULL;
+static int   s_colr_emoji_ready    = 0;
 
 #ifdef PV_HAS_FREETYPE
 static FT_Library s_ft_lib   = NULL;
 static FT_Face    s_ft_noto  = NULL;
 static FT_Face    s_ft_jp    = NULL;
-static FT_Face    s_ft_emoji = NULL;
 
 static FT_Face load_ft_face_dual(const char *app0_path, const char *rel_path) {
     if (!s_ft_lib) return NULL;
@@ -105,11 +107,8 @@ int ui_init(void) {
         g_font_jp = vita2d_load_font_file("assets/fonts/NotoSansJP-Regular.ttf");
     }
 
-    /* 3. NotoEmoji-Regular.ttf for Monochrome Emojis & Symbols */
-    g_font_emoji = vita2d_load_font_file("app0:assets/fonts/NotoEmoji-Regular.ttf");
-    if (!g_font_emoji) {
-        g_font_emoji = vita2d_load_font_file("assets/fonts/NotoEmoji-Regular.ttf");
-    }
+    /* 3. NotoColorEmoji-Regular.ttf via COLRv1 + CPAL + FreeType RGBA renderer */
+    s_colr_emoji_ready = (emoji_colr_init() == 0);
 
     if (!g_font_noto && !g_font_jp) {
         g_font_pvf_fallback = vita2d_load_default_pvf();
@@ -117,9 +116,8 @@ int ui_init(void) {
 
 #ifdef PV_HAS_FREETYPE
     if (FT_Init_FreeType(&s_ft_lib) == 0) {
-        if (g_font_noto)  s_ft_noto  = load_ft_face_dual("app0:assets/fonts/NotoSans-Regular.ttf",   "assets/fonts/NotoSans-Regular.ttf");
-        if (g_font_jp)    s_ft_jp    = load_ft_face_dual("app0:assets/fonts/NotoSansJP-Regular.ttf", "assets/fonts/NotoSansJP-Regular.ttf");
-        if (g_font_emoji) s_ft_emoji = load_ft_face_dual("app0:assets/fonts/NotoEmoji-Regular.ttf",  "assets/fonts/NotoEmoji-Regular.ttf");
+        if (g_font_noto) s_ft_noto = load_ft_face_dual("app0:assets/fonts/NotoSans-Regular.ttf",   "assets/fonts/NotoSans-Regular.ttf");
+        if (g_font_jp)   s_ft_jp   = load_ft_face_dual("app0:assets/fonts/NotoSansJP-Regular.ttf", "assets/fonts/NotoSansJP-Regular.ttf");
     }
 #endif
 
@@ -146,11 +144,12 @@ void ui_clear_thumbnails(void) {
 
 void ui_term(void) {
     ui_clear_thumbnails();
+    emoji_colr_term();
+    s_colr_emoji_ready = 0;
 #ifdef PV_HAS_FREETYPE
-    if (s_ft_noto)  { FT_Done_Face(s_ft_noto);      s_ft_noto = NULL; }
-    if (s_ft_jp)    { FT_Done_Face(s_ft_jp);        s_ft_jp = NULL; }
-    if (s_ft_emoji) { FT_Done_Face(s_ft_emoji);     s_ft_emoji = NULL; }
-    if (s_ft_lib)   { FT_Done_FreeType(s_ft_lib);   s_ft_lib = NULL; }
+    if (s_ft_noto) { FT_Done_Face(s_ft_noto);    s_ft_noto = NULL; }
+    if (s_ft_jp)   { FT_Done_Face(s_ft_jp);      s_ft_jp = NULL; }
+    if (s_ft_lib)  { FT_Done_FreeType(s_ft_lib); s_ft_lib = NULL; }
 #endif
     if (g_font_noto)         { vita2d_free_font(g_font_noto);            g_font_noto = NULL; }
     if (g_font_jp)           { vita2d_free_font(g_font_jp);              g_font_jp = NULL; }
@@ -346,30 +345,16 @@ static vita2d_font* select_font_for_codepoint(uint32_t cp) {
                  (cp >= 0xFF00 && cp <= 0xFFEF);   /* Halfwidth & Fullwidth Forms */
 
 #ifdef PV_HAS_FREETYPE
-    if (is_full_emoji_unicode_codepoint(cp)) {
-        if (g_font_emoji && font_has_glyph(s_ft_emoji, cp)) return g_font_emoji;
-        if (g_font_noto  && font_has_glyph(s_ft_noto,  cp)) return g_font_noto;
-        if (g_font_jp    && font_has_glyph(s_ft_jp,    cp)) return g_font_jp;
-        return NULL;
-    }
-
     if (is_cjk) {
-        if (g_font_jp    && font_has_glyph(s_ft_jp,    cp)) return g_font_jp;
-        if (g_font_noto  && font_has_glyph(s_ft_noto,  cp)) return g_font_noto;
-        if (g_font_emoji && font_has_glyph(s_ft_emoji, cp)) return g_font_emoji;
+        if (g_font_jp   && font_has_glyph(s_ft_jp,   cp)) return g_font_jp;
+        if (g_font_noto && font_has_glyph(s_ft_noto, cp)) return g_font_noto;
         return NULL;
     }
 
-    if (g_font_noto  && font_has_glyph(s_ft_noto,  cp)) return g_font_noto;
-    if (g_font_jp    && font_has_glyph(s_ft_jp,    cp)) return g_font_jp;
-    if (g_font_emoji && font_has_glyph(s_ft_emoji, cp)) return g_font_emoji;
+    if (g_font_noto && font_has_glyph(s_ft_noto, cp)) return g_font_noto;
+    if (g_font_jp   && font_has_glyph(s_ft_jp,   cp)) return g_font_jp;
     return NULL;
 #else
-    if (is_full_emoji_unicode_codepoint(cp)) {
-        if (g_font_emoji) return g_font_emoji;
-        if (g_font_noto)  return g_font_noto;
-    }
-
     if (is_cjk) {
         if (g_font_jp) return g_font_jp;
     }
@@ -384,7 +369,7 @@ static vita2d_font* select_font_for_codepoint(uint32_t cp) {
 void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const char *text) {
     if (!text || text[0] == '\0') return;
 
-    /* Multi-font fallback rendering for mixed Latin, Cyrillic, Greek, Japanese & Emojis */
+    /* Multi-font + COLRv1 color emoji rendering for Latin, Cyrillic, Greek, Japanese & Color Emojis */
     const char *p = text;
     float cur_x = x;
     char chunk[512];
@@ -396,12 +381,31 @@ void ui_draw_text(float x, float y, unsigned int color, unsigned int size, const
         uint32_t cp = utf8_next_codepoint(&p);
         size_t bytes = (size_t)(p - prev_p);
 
-        if (cp == 0xFFFD) {
+        if (cp == 0xFFFD || is_invisible_format_codepoint(cp)) {
+            continue;
+        }
+
+        if (s_colr_emoji_ready && is_full_emoji_unicode_codepoint(cp) && emoji_colr_has_codepoint(cp)) {
+            if (chunk_len > 0) {
+                chunk[chunk_len] = '\0';
+                if (cur_font) {
+                    vita2d_font_draw_text(cur_font, (int)cur_x, (int)y, color, size, chunk);
+                    cur_x += (float)vita2d_font_text_width(cur_font, size, chunk);
+                } else if (g_font_pvf_fallback) {
+                    float pvf_scale = (float)size / 20.0f;
+                    vita2d_pvf_draw_text(g_font_pvf_fallback, cur_x, y, color, pvf_scale, chunk);
+                    cur_x += (float)vita2d_pvf_text_width(g_font_pvf_fallback, pvf_scale, chunk);
+                }
+                chunk_len = 0;
+            }
+            cur_font = NULL;
+            emoji_colr_draw(cp, cur_x, y, size, color);
+            cur_x += emoji_colr_advance(size);
             continue;
         }
 
         vita2d_font *target_font = select_font_for_codepoint(cp);
-        if (target_font == NULL && (g_font_noto || g_font_jp || g_font_emoji)) {
+        if (target_font == NULL && (g_font_noto || g_font_jp || s_colr_emoji_ready)) {
             continue;
         }
 
@@ -446,7 +450,7 @@ int ui_get_text_width(unsigned int size, const char *text) {
     if (!text || text[0] == '\0') return 0;
 
     const char *p = text;
-    int total_w = 0;
+    float total_w = 0.0f;
     char chunk[512];
     size_t chunk_len = 0;
     vita2d_font *cur_font = NULL;
@@ -456,12 +460,28 @@ int ui_get_text_width(unsigned int size, const char *text) {
         uint32_t cp = utf8_next_codepoint(&p);
         size_t bytes = (size_t)(p - prev_p);
 
-        if (cp == 0xFFFD) {
+        if (cp == 0xFFFD || is_invisible_format_codepoint(cp)) {
+            continue;
+        }
+
+        if (s_colr_emoji_ready && is_full_emoji_unicode_codepoint(cp) && emoji_colr_has_codepoint(cp)) {
+            if (chunk_len > 0) {
+                chunk[chunk_len] = '\0';
+                if (cur_font) {
+                    total_w += (float)vita2d_font_text_width(cur_font, size, chunk);
+                } else if (g_font_pvf_fallback) {
+                    float pvf_scale = (float)size / 20.0f;
+                    total_w += (float)vita2d_pvf_text_width(g_font_pvf_fallback, pvf_scale, chunk);
+                }
+                chunk_len = 0;
+            }
+            cur_font = NULL;
+            total_w += emoji_colr_advance(size);
             continue;
         }
 
         vita2d_font *target_font = select_font_for_codepoint(cp);
-        if (target_font == NULL && (g_font_noto || g_font_jp || g_font_emoji)) {
+        if (target_font == NULL && (g_font_noto || g_font_jp || s_colr_emoji_ready)) {
             continue;
         }
 
@@ -473,10 +493,10 @@ int ui_get_text_width(unsigned int size, const char *text) {
             if (chunk_len > 0) {
                 chunk[chunk_len] = '\0';
                 if (cur_font) {
-                    total_w += vita2d_font_text_width(cur_font, size, chunk);
+                    total_w += (float)vita2d_font_text_width(cur_font, size, chunk);
                 } else if (g_font_pvf_fallback) {
                     float pvf_scale = (float)size / 20.0f;
-                    total_w += vita2d_pvf_text_width(g_font_pvf_fallback, pvf_scale, chunk);
+                    total_w += (float)vita2d_pvf_text_width(g_font_pvf_fallback, pvf_scale, chunk);
                 }
                 chunk_len = 0;
             }
@@ -492,14 +512,14 @@ int ui_get_text_width(unsigned int size, const char *text) {
     if (chunk_len > 0) {
         chunk[chunk_len] = '\0';
         if (cur_font) {
-            total_w += vita2d_font_text_width(cur_font, size, chunk);
+            total_w += (float)vita2d_font_text_width(cur_font, size, chunk);
         } else if (g_font_pvf_fallback) {
             float pvf_scale = (float)size / 20.0f;
-            total_w += vita2d_pvf_text_width(g_font_pvf_fallback, pvf_scale, chunk);
+            total_w += (float)vita2d_pvf_text_width(g_font_pvf_fallback, pvf_scale, chunk);
         }
     }
 
-    return total_w;
+    return (int)ceilf(total_w);
 }
 
 void ui_draw_text_centered(float center_x, float y, unsigned int color, unsigned int size, const char *text) {

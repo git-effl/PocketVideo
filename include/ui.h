@@ -42,7 +42,7 @@ extern vita2d_texture *g_tex_bg;
 extern vita2d_texture *g_tex_bubble_glass;
 extern vita2d_font *g_font_noto;  /* NotoSans-Regular.ttf for Latin, Cyrillic, Greek, Numbers & Symbols */
 extern vita2d_font *g_font_jp;    /* NotoSansJP-Regular.ttf for Japanese Kanji, Hiragana & Katakana */
-extern vita2d_font *g_font_emoji; /* NotoEmoji-Regular.ttf for Emojis */
+extern vita2d_font *g_font_emoji; /* Reserved; NotoColorEmoji-Regular.ttf rendered via emoji_colr */
 extern vita2d_pvf  *g_font_pvf_fallback;
 
 int ui_init(void);

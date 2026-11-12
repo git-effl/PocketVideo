@@ -1,6 +1,6 @@
 TITLE_ID = PKTV00001
 TARGET   = PocketVideo
-OBJS     = src/main.o src/network.o src/invidious.o src/ui.o src/cJSON.o src/compat.o
+OBJS     = src/main.o src/network.o src/invidious.o src/ui.o src/emoji_colr.o src/cJSON.o src/compat.o
 
 LIBS = -lvita2d -lfreetype -lbz2 -lpng -ljpeg -lz -lcurl -lssl -lcrypto -lzstd -lpthread \
        -lSceLibKernel_stub -lSceDisplay_stub -lSceGxm_stub -lSceCtrl_stub \
@@ -28,7 +28,7 @@ all: $(TARGET).vpk
 		--add sce_sys/livearea/contents/startup.png=sce_sys/livearea/contents/startup.png \
 		--add sce_sys/livearea/contents/template.xml=sce_sys/livearea/contents/template.xml \
 		--add assets/fonts/NotoSans-Regular.ttf=assets/fonts/NotoSans-Regular.ttf \
-		--add assets/fonts/NotoEmoji-Regular.ttf=assets/fonts/NotoEmoji-Regular.ttf \
+		--add assets/fonts/NotoColorEmoji-Regular.ttf=assets/fonts/NotoColorEmoji-Regular.ttf \
 		--add assets/fonts/NotoSansJP-Regular.ttf=assets/fonts/NotoSansJP-Regular.ttf \
 		--add assets/textures/bg.png=assets/textures/bg.png \
 		--add assets/textures/bubble_glass.png=assets/textures/bubble_glass.png \
