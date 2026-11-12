@@ -824,7 +824,7 @@ void ui_draw_description_modal(const VideoItem *item, int scroll_line) {
 
     char views_buf[40];
     format_views_commas(item->view_count, views_buf, sizeof(views_buf));
-    char meta[384];
+    char meta[512];
     snprintf(meta, sizeof(meta), "Channel: %s   |   Views: %s   |   Published: %s",
              item->author, views_buf, item->published_text[0] ? item->published_text : "N/A");
     ui_draw_text(mx + 24, my + 104, COLOR_HIGHLIGHT_AMBER, 14, meta);

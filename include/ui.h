@@ -42,7 +42,7 @@ extern vita2d_texture *g_tex_bg;
 extern vita2d_texture *g_tex_bubble_glass;
 extern vita2d_font *g_font_noto;  /* NotoSans-Regular.ttf for Latin, Cyrillic, Greek, Numbers & Symbols */
 extern vita2d_font *g_font_jp;    /* NotoSansJP-Regular.ttf for Japanese Kanji, Hiragana & Katakana */
-extern vita2d_font *g_font_emoji; /* NotoColorEmoji-Regular.ttf for Emojis */
+extern vita2d_font *g_font_emoji; /* NotoEmoji-Regular.ttf for Emojis */
 extern vita2d_pvf  *g_font_pvf_fallback;
 
 int ui_init(void);
@@ -62,7 +62,6 @@ void ui_draw_search_bar(const char *query, int is_search_mode, int search_type);
 
 /* Thumbnail & Avatar texture cache helpers */
 vita2d_texture *ui_get_cached_thumbnail(const char *video_id);
-vita2d_texture *ui_get_cached_banner(const char *url);
 void ui_fetch_one_visible_thumbnail(const VideoList *list, int offset, int visible_count);
 void ui_fetch_channel_assets(const ChannelInfo *channel);
 void ui_clear_thumbnails(void);

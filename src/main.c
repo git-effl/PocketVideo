@@ -60,6 +60,12 @@
 #ifndef PSP2_CTRL_TRIANGLE
 #define PSP2_CTRL_TRIANGLE SCE_CTRL_TRIANGLE
 #endif
+#ifndef PSP2_CTRL_LTRIGGER
+#define PSP2_CTRL_LTRIGGER SCE_CTRL_LTRIGGER
+#endif
+#ifndef PSP2_CTRL_RTRIGGER
+#define PSP2_CTRL_RTRIGGER SCE_CTRL_RTRIGGER
+#endif
 #ifndef SCE_IME_DIALOG_BUTTON_ENTER
 #define SCE_IME_DIALOG_BUTTON_ENTER 1
 #endif
@@ -574,7 +580,7 @@ int main(int argc, char *argv[]) {
                     g_is_search_mode = 1;
                     g_current_view = VIEW_TRENDING_LIST;
 #ifdef __vita__
-                    open_keyboard("Search YouTube or Channels", g_search_query);
+                    open_keyboard("Search Invidious or Channels", g_search_query);
 #endif
                 } else if (g_bubble_selected == 2) {
                     g_current_view = VIEW_SETTINGS;
@@ -589,7 +595,7 @@ int main(int argc, char *argv[]) {
                     perform_search(g_search_query);
                 } else {
 #ifdef __vita__
-                    open_keyboard("Search YouTube or Channels", g_search_query);
+                    open_keyboard("Search Invidious or Channels", g_search_query);
 #endif
                 }
             }
@@ -630,18 +636,32 @@ int main(int argc, char *argv[]) {
 #endif
                         }
                     } else if (tap_x >= 884 && tap_x <= 950) {
-                        g_is_search_mode = 0;
-                        g_search_query[0] = '\0';
-                        memcpy(&g_active_list, &g_trending_cache, sizeof(VideoList));
-                        g_selected_index = 0;
+                        if (g_is_search_mode) {
+                            g_is_search_mode = 0;
+                            g_search_query[0] = '\0';
+                            memcpy(&g_active_list, &g_trending_cache, sizeof(VideoList));
+                            g_selected_index = 0;
+                        } else {
+                            render_loading_banner("Refreshing Popular Feed...", "Connecting to Invidious...");
+                            ui_clear_thumbnails();
+                            int count = invidious_fetch_trending(INVIDIOUS_DEFAULT_HOST, &g_trending_cache);
+                            if (count > 0) {
+                                memcpy(&g_active_list, &g_trending_cache, sizeof(VideoList));
+                                snprintf(g_status_msg, sizeof(g_status_msg), "Loaded %d popular videos.", count);
+                            }
+                            g_selected_index = 0;
+                        }
                     } else if (tap_x >= 20 && tap_x <= 718) {
 #ifdef __vita__
-                        open_keyboard("Search", g_search_query);
+                        open_keyboard("Search Invidious", g_search_query);
 #endif
                     }
                 } else if (tap_y >= 80 && tap_y <= 520) {
-                    int clicked_idx = (int)((tap_y - 80) / 84);
-                    if (clicked_idx >= 0 && clicked_idx < 5 && clicked_idx < g_active_list.count) {
+                    int visible = 5;
+                    int offset = (g_selected_index >= visible) ? (g_selected_index - visible + 1) : 0;
+                    int slot = (int)((tap_y - 80.0f) / 88.0f);
+                    int clicked_idx = offset + slot;
+                    if (slot >= 0 && slot < visible && clicked_idx < g_active_list.count) {
                         g_selected_index = clicked_idx;
                         VideoItem *sel = &g_active_list.items[g_selected_index];
                         if (sel->is_channel) {
@@ -702,10 +722,10 @@ int main(int argc, char *argv[]) {
                     if (g_channel_video_idx > 0) g_channel_video_idx--;
                 }
                 if (tap_event) {
-                    if (tap_y >= 110 && tap_y <= 152 && tap_x >= 770) {
+                    if (tap_y >= 158 && tap_y <= 194 && tap_x >= 770) {
                         g_channel_desc_modal = 1;
                         g_channel_desc_scroll = 0;
-                    } else if (tap_y >= 154 && tap_y <= 194) {
+                    } else if (tap_y >= 198 && tap_y <= 232) {
                         int tab_tapped = (int)((tap_x - 20.0f) / 186.0f);
                         if (tab_tapped >= 0 && tab_tapped < 5 && tab_tapped != g_channel_tab) {
                             g_channel_tab = tab_tapped;
@@ -714,9 +734,12 @@ int main(int argc, char *argv[]) {
                             invidious_fetch_channel_videos(INVIDIOUS_DEFAULT_HOST, g_current_channel.author_id, tabs[g_channel_tab], &g_channel_videos);
                             g_channel_video_idx = 0;
                         }
-                    } else if (tap_y >= 196 && tap_y <= 520) {
-                        int card_tapped = (int)((tap_y - 196) / 84);
-                        if (card_tapped >= 0 && card_tapped < 4 && card_tapped < g_channel_videos.count) {
+                    } else if (tap_y >= 236 && tap_y <= 532) {
+                        int visible = 4;
+                        int offset = (g_channel_video_idx >= visible) ? (g_channel_video_idx - visible + 1) : 0;
+                        int slot = (int)((tap_y - 236.0f) / 74.0f);
+                        int card_tapped = offset + slot;
+                        if (slot >= 0 && slot < visible && card_tapped < g_channel_videos.count) {
                             g_channel_video_idx = card_tapped;
                             start_video_playback(&g_channel_videos.items[g_channel_video_idx]);
                         }
@@ -734,19 +757,86 @@ int main(int argc, char *argv[]) {
         }
         /* VIEW: VIDEO PLAYER */
         else if (g_current_view == VIEW_PLAYER) {
+#ifdef __vita__
+            /* Update AvPlayer video frame & playback timestamp */
+            if (g_av_player >= 0) {
+                SceAvPlayerFrameInfo vframe;
+                memset(&vframe, 0, sizeof(vframe));
+                if (sceAvPlayerGetVideoData(g_av_player, &vframe) == SCE_TRUE && vframe.pData) {
+                    uint32_t vw = vframe.details.video.width;
+                    uint32_t vh = vframe.details.video.height;
+                    if (vw > 0 && vh > 0) {
+                        if (!g_video_tex ||
+                            vita2d_texture_get_width(g_video_tex) != vw ||
+                            vita2d_texture_get_height(g_video_tex) != vh) {
+                            if (g_video_tex) {
+                                vita2d_free_texture(g_video_tex);
+                                g_video_tex = NULL;
+                            }
+                            g_video_tex = vita2d_create_empty_texture_format(
+                                vw, vh, SCE_GXM_TEXTURE_FORMAT_U8U8U8U8_ABGR);
+                        }
+                        if (g_video_tex) {
+                            uint8_t *dst = (uint8_t *)vita2d_texture_get_datap(g_video_tex);
+                            uint32_t stride = vita2d_texture_get_stride(g_video_tex);
+                            uint32_t row_bytes = vw * 4;
+                            if (dst) {
+                                if (stride == row_bytes) {
+                                    memcpy(dst, vframe.pData, (size_t)row_bytes * vh);
+                                } else {
+                                    for (uint32_t r = 0; r < vh; r++) {
+                                        memcpy(dst + (r * stride), vframe.pData + (r * row_bytes), row_bytes);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                g_player_cur_ms = sceAvPlayerCurrentTime(g_av_player);
+                if (g_player_total_ms == 0) {
+                    SceAvPlayerStreamInfo sinfo;
+                    memset(&sinfo, 0, sizeof(sinfo));
+                    if (sceAvPlayerGetStreamInfo(g_av_player, 0, &sinfo) == 0 && sinfo.duration > 0) {
+                        g_player_total_ms = sinfo.duration;
+                    }
+                }
+            }
+#endif
+            /* Auto-fade playback HUD when idle */
+            if (!g_player_desc_open && !g_player_comments_open && !g_player_paused) {
+                if (g_player_hud_timer > 0) {
+                    g_player_hud_timer--;
+                } else if (g_player_hud_alpha > 0.0f) {
+                    g_player_hud_alpha -= 0.035f;
+                    if (g_player_hud_alpha < 0.0f) g_player_hud_alpha = 0.0f;
+                }
+            }
+
             if (g_player_comments_open) {
                 if ((btn_pressed & PSP2_CTRL_DOWN) || stick_down) g_player_comments_scroll++;
                 if ((btn_pressed & PSP2_CTRL_UP) || stick_up) { if (g_player_comments_scroll > 0) g_player_comments_scroll--; }
                 if ((btn_pressed & PSP2_CTRL_CIRCLE) || (btn_pressed & PSP2_CTRL_TRIANGLE) || (btn_pressed & PSP2_CTRL_SQUARE) || tap_event) {
                     g_player_comments_open = 0;
+                    g_player_hud_alpha = 1.0f;
+                    g_player_hud_timer = 240;
                 }
             } else if (g_player_desc_open) {
                 if ((btn_pressed & PSP2_CTRL_DOWN) || stick_down) g_player_desc_scroll++;
                 if ((btn_pressed & PSP2_CTRL_UP) || stick_up) { if (g_player_desc_scroll > 0) g_player_desc_scroll--; }
                 if ((btn_pressed & PSP2_CTRL_CIRCLE) || (btn_pressed & PSP2_CTRL_SQUARE) || tap_event) {
                     g_player_desc_open = 0;
+                    g_player_hud_alpha = 1.0f;
+                    g_player_hud_timer = 240;
                 }
             } else {
+                int hud_was_hidden = (g_player_hud_alpha < 0.1f);
+                if (btn_pressed || tap_event) {
+                    g_player_hud_alpha = 1.0f;
+                    g_player_hud_timer = 240;
+                }
+                if (hud_was_hidden && tap_event) {
+                    tap_event = 0;
+                }
                 if (btn_pressed & PSP2_CTRL_TRIANGLE) {
                     g_player_comments_open = 1;
                     g_player_comments_scroll = 0;
@@ -760,16 +850,46 @@ int main(int argc, char *argv[]) {
                     g_player_desc_open = 1;
                     g_player_desc_scroll = 0;
                 }
+                if (btn_pressed & PSP2_CTRL_LTRIGGER) {
+                    if (g_player_cur_ms >= 10000ULL) g_player_cur_ms -= 10000ULL; else g_player_cur_ms = 0;
+#ifdef __vita__
+                    if (g_av_player >= 0) sceAvPlayerJumpToTime(g_av_player, g_player_cur_ms);
+#endif
+                }
+                if (btn_pressed & PSP2_CTRL_RTRIGGER) {
+                    g_player_cur_ms += 10000ULL;
+                    if (g_player_total_ms > 0 && g_player_cur_ms > g_player_total_ms) {
+                        g_player_cur_ms = g_player_total_ms;
+                    }
+#ifdef __vita__
+                    if (g_av_player >= 0) sceAvPlayerJumpToTime(g_av_player, g_player_cur_ms);
+#endif
+                }
                 if (tap_event) {
                     if (tap_y >= 480 && tap_x >= 150 && tap_x <= 266) {
                         /* -10s seek back */
                         if (g_player_cur_ms >= 10000ULL) g_player_cur_ms -= 10000ULL; else g_player_cur_ms = 0;
+#ifdef __vita__
+                        if (g_av_player >= 0) sceAvPlayerJumpToTime(g_av_player, g_player_cur_ms);
+#endif
                     } else if (tap_y >= 480 && tap_x >= 270 && tap_x <= 398) {
                         /* Play / Pause toggle */
                         g_player_paused = !g_player_paused;
+#ifdef __vita__
+                        if (g_av_player >= 0) {
+                            if (g_player_paused) sceAvPlayerPause(g_av_player);
+                            else sceAvPlayerResume(g_av_player);
+                        }
+#endif
                     } else if (tap_y >= 480 && tap_x >= 402 && tap_x <= 514) {
                         /* +10s seek forward */
                         g_player_cur_ms += 10000ULL;
+                        if (g_player_total_ms > 0 && g_player_cur_ms > g_player_total_ms) {
+                            g_player_cur_ms = g_player_total_ms;
+                        }
+#ifdef __vita__
+                        if (g_av_player >= 0) sceAvPlayerJumpToTime(g_av_player, g_player_cur_ms);
+#endif
                     } else if (tap_y >= 480 && tap_x >= 518 && tap_x <= 664) {
                         /* Description modal */
                         g_player_desc_open = 1;
@@ -788,10 +908,22 @@ int main(int argc, char *argv[]) {
                         g_current_view = VIEW_TRENDING_LIST;
                     } else {
                         g_player_paused = !g_player_paused;
+#ifdef __vita__
+                        if (g_av_player >= 0) {
+                            if (g_player_paused) sceAvPlayerPause(g_av_player);
+                            else sceAvPlayerResume(g_av_player);
+                        }
+#endif
                     }
                 }
                 if ((btn_pressed & PSP2_CTRL_CROSS)) {
                     g_player_paused = !g_player_paused;
+#ifdef __vita__
+                    if (g_av_player >= 0) {
+                        if (g_player_paused) sceAvPlayerPause(g_av_player);
+                        else sceAvPlayerResume(g_av_player);
+                    }
+#endif
                 }
                 if (btn_pressed & PSP2_CTRL_CIRCLE) {
                     stop_video_playback();
@@ -854,7 +986,11 @@ int main(int argc, char *argv[]) {
                                  g_channel_desc_modal, g_channel_desc_scroll);
         }
         else if (g_current_view == VIEW_PLAYER) {
-            ui_draw_player_screen(&g_playing_item, g_video_tex, NULL,
+            const char *thumb_key = (g_playing_item.thumbnail_url[0] != '\0')
+                                    ? g_playing_item.thumbnail_url
+                                    : g_playing_item.id;
+            vita2d_texture *fallback_thumb = ui_get_cached_thumbnail(thumb_key);
+            ui_draw_player_screen(&g_playing_item, g_video_tex, fallback_thumb,
                                    g_player_hud_alpha, g_player_paused,
                                    g_player_cur_ms, g_player_total_ms,
                                    g_player_desc_open, g_player_desc_scroll,
